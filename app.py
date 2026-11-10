@@ -1,36 +1,51 @@
 from flask import Flask, request, jsonify
+from datetime import datetime
 
 app = Flask(__name__)
 
 questions_db = []
 question_id_counter = 1
 
-# [조회 & 검색 API] 검색어가 있으면 필터링해서 반환
+# [조회 & 검색 & 정렬 API]
 @app.route('/api/questions', methods=['GET'])
 def get_questions():
     search_keyword = request.args.get('search', '').strip()
+    sort_type = request.args.get('sort', 'latest') # 기본값: 최신순
     
+    # 1. 검색어 필터링
     filtered_questions = questions_db
     if search_keyword:
         filtered_questions = [q for q in questions_db if search_keyword in q['content']]
         
-    return jsonify(filtered_questions[::-1]), 200
+    # 2. 정렬 처리
+    if sort_type == 'likes':
+        # 공감순 정렬 (공감이 많고, 최신인 것 우선)
+        sorted_questions = sorted(filtered_questions, key=lambda x: (x['likes'], x['id']), reverse=True)
+    else:
+        # 최신순 정렬 (기본)
+        sorted_questions = filtered_questions[::-1]
+        
+    return jsonify(sorted_questions), 200
 
-# [작성 API] 카테고리 데이터 함께 저장
+# [작성 API] 카테고리 및 현재 시간 저장
 @app.route('/api/questions', methods=['POST'])
 def create_question():
     global question_id_counter
     data = request.get_json()
     content = data.get('content', '').strip()
-    category = data.get('category', '기타') # 프론트에서 보낸 카테고리 받기
+    category = data.get('category', '기타')
 
     if not content:
         return jsonify({'error': '내용을 입력하세요.'}), 400
+
+    # 현재 시간을 'YYYY-MM-DD HH:MM' 형식으로 생성
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
 
     new_question = {
         'id': question_id_counter,
         'category': category,
         'content': content,
+        'created_at': current_time,
         'likes': 0,
         'comments': []
     }
@@ -38,6 +53,17 @@ def create_question():
     question_id_counter += 1
 
     return jsonify(new_question), 201
+
+# [삭제 API]
+@app.route('/api/questions/<int:q_id>', methods=['DELETE'])
+def delete_question(q_id):
+    global questions_db
+    initial_len = len(questions_db)
+    questions_db = [q for q in questions_db if q['id'] != q_id]
+    
+    if len(questions_db) < initial_len:
+        return jsonify({'message': '삭제되었습니다.'}), 200
+    return jsonify({'error': '질문을 찾을 수 없습니다.'}), 404
 
 # [공감 API]
 @app.route('/api/questions/<int:q_id>/like', methods=['POST'])

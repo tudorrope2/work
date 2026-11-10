@@ -2,37 +2,44 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# 임시 데이터 저장소
 questions_db = []
 question_id_counter = 1
 
-# [기능 2] 질문 목록 조회 API
+# [조회 & 검색 API] 검색어가 있으면 필터링해서 반환
 @app.route('/api/questions', methods=['GET'])
 def get_questions():
-    return jsonify(questions_db[::-1]), 200
+    search_keyword = request.args.get('search', '').strip()
+    
+    filtered_questions = questions_db
+    if search_keyword:
+        filtered_questions = [q for q in questions_db if search_keyword in q['content']]
+        
+    return jsonify(filtered_questions[::-1]), 200
 
-# [기능 1] 질문 작성 API
+# [작성 API] 카테고리 데이터 함께 저장
 @app.route('/api/questions', methods=['POST'])
 def create_question():
     global question_id_counter
     data = request.get_json()
     content = data.get('content', '').strip()
+    category = data.get('category', '기타') # 프론트에서 보낸 카테고리 받기
 
     if not content:
         return jsonify({'error': '내용을 입력하세요.'}), 400
 
     new_question = {
         'id': question_id_counter,
+        'category': category,
         'content': content,
         'likes': 0,
-        'comments': [] # 댓글 저장용 리스트 추가
+        'comments': []
     }
     questions_db.append(new_question)
     question_id_counter += 1
 
     return jsonify(new_question), 201
 
-# [기능 3] 질문 공감 누르기 API
+# [공감 API]
 @app.route('/api/questions/<int:q_id>/like', methods=['POST'])
 def like_question(q_id):
     for q in questions_db:
@@ -41,7 +48,7 @@ def like_question(q_id):
             return jsonify(q), 200
     return jsonify({'error': '질문을 찾을 수 없습니다.'}), 404
 
-# [기능 4] 댓글 달기 API (추가됨)
+# [댓글 API]
 @app.route('/api/questions/<int:q_id>/comments', methods=['POST'])
 def add_comment(q_id):
     data = request.get_json()
@@ -57,7 +64,6 @@ def add_comment(q_id):
             
     return jsonify({'error': '질문을 찾을 수 없습니다.'}), 404
 
-# 헬스 체크 API
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'ok'}), 200

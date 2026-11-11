@@ -98,18 +98,26 @@
                 if (i < targetText.length && typed[i] === targetText[i]) {
                     correctCount++;
                 } else {
-                    // 오타가 나기 시작하면 그 이후부터는 일치 카운트를 올리지 않음
+                    // 오타가 나도 멈추지 않고, 일치하는 글자까지만 카운트
                     break;
                 }
             }
             
-            // 정확히 맞춘 글자 기준으로 진척도(%) 계산
-            let progress = Math.floor((correctCount / targetText.length) * 100);
+            // 퍼센트 계산 (0% ~ 100%)
+            let progress = 0;
+            if (targetText.length > 0) {
+                progress = Math.floor((correctCount / targetText.length) * 100);
+            }
             if (progress > 100) progress = 100;
+            if (typed.length > 0 && progress === 0) {
+                // 글자를 치기 시작했다면 최소 1% 이상으로 시각적 피드백 제공
+                progress = Math.max(1, Math.floor((typed.length / targetText.length) * 100));
+            }
 
+            // 서버로 진척도 전송
             socket.emit('update_progress', { room: currentRoom, progress: progress });
 
-            // 문장 전체가 정확히 일치했을 때 완주 처리
+            // 완주 판정
             if (typed.trim() === targetText.trim()) {
                 gameActive = false;
                 document.getElementById('typingInput').disabled = true;

@@ -110,7 +110,6 @@
         button:hover { background: #0284c7; }
         .hidden { display: none !important; }
 
-        /* 결과 모달 팝업 */
         #resultModal {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -147,7 +146,7 @@
 </head>
 <body>
     <div class="container">
-        <!-- 결과 팝업 모달 (기본적으로 반드시 숨김 처리) -->
+        <!-- 결과 팝업 모달 -->
         <div id="resultModal" class="hidden">
             <div class="modal-content">
                 <h3 id="modalTitle">🎉 완주 축하합니다!</h3>
@@ -160,7 +159,7 @@
 
         <h2>⚡ 실시간 타이핑 아레나</h2>
         
-        <!-- 로비 화면 (초기 접속 시 표시) -->
+        <!-- 로비 화면 -->
         <div id="lobby" class="box">
             <label style="display:block; margin-bottom:5px;">닉네임:</label>
             <input type="text" id="nicknameInput" placeholder="닉네임을 입력하세요" style="margin-bottom: 15px;">
@@ -169,7 +168,7 @@
             <button onclick="joinRoom()">방 입장하기</button>
         </div>
 
-        <!-- 게임 방 화면 (초기 숨김) -->
+        <!-- 게임 방 화면 -->
         <div id="gameRoom" class="hidden">
             <div class="stats">
                 <span id="roomInfo">방: -</span>
@@ -186,6 +185,7 @@
                 <input type="text" id="typingInput" placeholder="시작 버튼을 누르면 타이핑할 수 있습니다." disabled oninput="checkTyping()">
             </div>
 
+            <!-- 시작 / 재시작 버튼 영역 -->
             <button id="startBtn" onclick="startGame()">게임 시작</button>
 
             <h3 style="margin-top: 20px; font-size: 15px; color: #334155; margin-bottom: 10px;">실시간 진척도</h3>
@@ -203,7 +203,6 @@
         let finalCpm = 0;
         let finalAccuracy = 100;
 
-        // 페이지 로드 시 팝업창 확실하게 숨기기
         document.addEventListener("DOMContentLoaded", () => {
             closeModal();
         });
@@ -233,12 +232,17 @@
             document.getElementById('userListDisplay').innerText = users.join(', ');
         });
 
-        socket.on("new_sentence", (data) => {
+        // 게임 시작 수신 처리 (버튼 숨김 적용)
+        socket.on("game_started", (data) => {
             targetText = data.sentence;
             gameActive = true;
             startTime = new Date().getTime();
             
             closeModal();
+
+            // 게임 시작 시 버튼 숨기기
+            const startBtn = document.getElementById('startBtn');
+            startBtn.classList.add('hidden');
 
             const input = document.getElementById('typingInput');
             input.value = '';
@@ -301,7 +305,6 @@
 
             socket.emit('user_progress', { room: currentRoom, nickname: currentNickname, progress: progress });
 
-            // 게임 진행 중이고 문장 입력을 완료한 경우에만 팝업 실행
             if (targetText.length > 0 && typed.length > 0 && typed.trim() === targetText.trim()) {
                 gameActive = false;
                 document.getElementById('typingInput').disabled = true;
@@ -331,6 +334,13 @@
 
         function closeModal() {
             document.getElementById('resultModal').classList.add('hidden');
+            
+            // 게임이 시작 상태가 아닐 때(종료/대기)만 버튼을 "게임 재시작" 상태로 복구
+            if (!gameActive) {
+                const startBtn = document.getElementById('startBtn');
+                startBtn.innerText = "🔄 게임 재시작";
+                startBtn.classList.remove('hidden');
+            }
         }
 
         socket.on("update_progress", (usersProgress) => {

@@ -5,7 +5,6 @@ from flask_socketio import SocketIO, join_room, emit
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# 한글 에세이/명언 연습 문장 리스트
 SENTENCES = [
     "삶은 어쨌든 인간으로 태어난 이상 인간이 바랄 수 있는 것만을 바랄 때 지속 가능한 것이다. 내가 인간으로 살아 있는 것을 잠시 멈추고 인간이 아닌 것으로 있기를 바랄 때 내가 선택할 수 있는 것은 작가가 되는 것이었다. 작가는 인간으로 살아 있기를 멈추고, 인간이 아닌 다른 것이 될 수 있다.",
     "나의 상상력은 클로이의 치아 사이의 틈에서 노는 것을 즐겼다. 그녀의 아름다움은 헝클어져 있었기 때문에 창조적 재배치가 가능했다. 클로이의 얼굴은 그 모호함 때문에, 오리와 토끼가 둘 다 들어 있는 것처럼 보이는 비트겐슈타인의 오리-토끼 그림과 비슷했다. 상상력이 오리를 찾으면 그는 오리를 보게 될 것이다. 상상력이 토끼를 찾으면 토끼가 나타날 것이다. 아는 그녀의 영혼으로 그녀의 얼굴에 생기를 불어넣었던 것이었다.",
@@ -34,7 +33,7 @@ rooms = {}
 
 @app.route('/')
 def index():
-    return render_template('index.html')  # index.html -> game.html 로 변경
+    return render_template('index.html')
 
 @socketio.on('join')
 def handle_join(data):
@@ -43,7 +42,7 @@ def handle_join(data):
     join_room(room)
     
     if room not in rooms:
-        rooms[room] = {'users': {}, 'sentence': ''}
+        rooms[room] = {'users': {}, 'sentence': '', 'is_playing': False}
     
     rooms[room]['users'][nickname] = 0
     emit('update_users', list(rooms[room]['users'].keys()), room=room)
@@ -52,13 +51,19 @@ def handle_join(data):
 @socketio.on('start_game')
 def handle_start(data):
     room = data['room']
-    if room in rooms and SENTENCES:
+    if room in rooms:
+        # 이미 진행 중이면 재시작 요청 무시
+        if rooms[room]['is_playing']:
+            return
+            
         selected_sentence = random.choice(SENTENCES)
         rooms[room]['sentence'] = selected_sentence
+        rooms[room]['is_playing'] = True
+        
         for user in rooms[room]['users']:
             rooms[room]['users'][user] = 0
             
-        emit('new_sentence', {'sentence': selected_sentence}, room=room)
+        emit('game_started', {'sentence': selected_sentence}, room=room)
         emit('update_progress', rooms[room]['users'], room=room)
 
 @socketio.on('user_progress')
@@ -71,7 +76,6 @@ def handle_user_progress(data):
         rooms[room]['users'][nickname] = progress
         emit('update_progress', rooms[room]['users'], room=room)
 
-# 누군가 완주했을 때 다른 참가자들에게도 알림 전송
 @socketio.on('finish_game')
 def handle_finish(data):
     room = data['room']
@@ -79,8 +83,9 @@ def handle_finish(data):
     cpm = data['cpm']
     accuracy = data['accuracy']
     
-    # 방에 있는 다른 모든 유저에게 완주 소식 브로드캐스트
-    emit('player_finished', {'nickname': nickname, 'cpm': cpm, 'accuracy': accuracy}, room=room)
+    if room in rooms:
+        rooms[room]['is_playing'] = False  # 게임 종료 상태 전환
+        emit('player_finished', {'nickname': nickname, 'cpm': cpm, 'accuracy': accuracy}, room=room)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)

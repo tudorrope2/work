@@ -235,6 +235,9 @@
             gameActive = true;
             startTime = new Date().getTime();
             
+            // 게임 시작 시 이전 팝업 무조건 닫기
+            closeModal();
+
             const input = document.getElementById('typingInput');
             input.value = '';
             input.disabled = false;
@@ -296,12 +299,11 @@
 
             socket.emit('user_progress', { room: currentRoom, nickname: currentNickname, progress: progress });
 
-            // 완주 판정
-            if (typed.trim() === targetText.trim()) {
+            // 완주 판정 (입력값이 비어있지 않고, 타겟 텍스트와 정확히 일치할 때만)
+            if (typed.length > 0 && typed.trim() === targetText.trim()) {
                 gameActive = false;
                 document.getElementById('typingInput').disabled = true;
 
-                // 서버로 완주 결과 전송
                 socket.emit('finish_game', { 
                     room: currentRoom, 
                     nickname: currentNickname, 
@@ -309,12 +311,10 @@
                     accuracy: finalAccuracy 
                 });
 
-                // 본인 화면에 결과 팝업 표시
                 showModal(`${currentNickname}님 완주!`, `타수: ${finalCpm} 타/분<br>정확도: ${finalAccuracy}%`);
             }
         }
 
-        // 상대방이 완주했을 때 실시간 알림 수신
         socket.on("player_finished", (data) => {
             if (data.nickname !== currentNickname) {
                 showModal(`🏆 ${data.nickname}님 완주 완료!`, `상대방 기록<br>타수: ${data.cpm} 타/분 | 정확도: ${data.accuracy}%`);

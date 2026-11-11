@@ -108,7 +108,7 @@
             transition: background 0.2s;
         }
         button:hover { background: #0284c7; }
-        .hidden { display: none; }
+        .hidden { display: none !important; }
 
         /* 결과 모달 팝업 */
         #resultModal {
@@ -120,7 +120,7 @@
             justify-content: center;
             align-items: center;
             border-radius: 16px;
-            z-index: 10;
+            z-index: 100;
         }
         .modal-content {
             background: #ffffff;
@@ -147,7 +147,7 @@
 </head>
 <body>
     <div class="container">
-        <!-- 결과 팝업 모달 -->
+        <!-- 결과 팝업 모달 (기본적으로 반드시 숨김 처리) -->
         <div id="resultModal" class="hidden">
             <div class="modal-content">
                 <h3 id="modalTitle">🎉 완주 축하합니다!</h3>
@@ -160,7 +160,7 @@
 
         <h2>⚡ 실시간 타이핑 아레나</h2>
         
-        <!-- 로비 화면 -->
+        <!-- 로비 화면 (초기 접속 시 표시) -->
         <div id="lobby" class="box">
             <label style="display:block; margin-bottom:5px;">닉네임:</label>
             <input type="text" id="nicknameInput" placeholder="닉네임을 입력하세요" style="margin-bottom: 15px;">
@@ -169,7 +169,7 @@
             <button onclick="joinRoom()">방 입장하기</button>
         </div>
 
-        <!-- 게임 방 화면 -->
+        <!-- 게임 방 화면 (초기 숨김) -->
         <div id="gameRoom" class="hidden">
             <div class="stats">
                 <span id="roomInfo">방: -</span>
@@ -202,6 +202,11 @@
         let startTime = null;
         let finalCpm = 0;
         let finalAccuracy = 100;
+
+        // 페이지 로드 시 팝업창 확실하게 숨기기
+        document.addEventListener("DOMContentLoaded", () => {
+            closeModal();
+        });
 
         function joinRoom() {
             const nickname = document.getElementById('nicknameInput').value.trim();
@@ -296,7 +301,7 @@
 
             socket.emit('user_progress', { room: currentRoom, nickname: currentNickname, progress: progress });
 
-            // 문장이 실제로 출제되어 있고, 입력값이 빈칸이 아니며 정확히 완주했을 때만 실행
+            // 게임 진행 중이고 문장 입력을 완료한 경우에만 팝업 실행
             if (targetText.length > 0 && typed.length > 0 && typed.trim() === targetText.trim()) {
                 gameActive = false;
                 document.getElementById('typingInput').disabled = true;

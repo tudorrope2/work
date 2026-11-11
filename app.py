@@ -25,12 +25,11 @@ SENTENCES = [
     "시간은 우리를 마음대로 휘두르고 전락시킨다. 그들이 공격하면 피할 수가 없고 사정없이 린치를 당한다. 어쩌면 나는 시간에 벌써 녹다운되었는지도 몰랐다. 도저히 이길 길이 없다. 이렇게 발버둥을 쳐도 이제 젊음과 집중력과 열의는 돌아 오지 않고, 한때 가졌던 애정조차 다 잊은 채 나는 비참히 쳇바퀴 같은 일상으로 돌아갈 것이다...",
     "내가 이해할 수 없어도, 내가 껴안을 수 없어도, 각자에겐 삶이 있는 법이다. 소설책을 핀다 거기 다른 사람이 있다. 거기 다른 진실들이 있다. 각자에게 각자의 진실을 돌려주려면 책을 읽을 수 밖에 없다.",
     "동행은 자기가 아닌 다른 사람을 중심에 두고 인생을 살아가는 방법이라고 할 수 있을 것이다. 누군가와 동행할 때는 의식이 이완된 상태가 된다. 세심하고 민감하면서도 조급하지 않은 상태이며, 상대방을 이끌거나 지시하지 않는다. 그 사람이 일상을 살아갈 때 당신은 그저 그 사람 곁에서 함께한다. 당신이 거기에 있는 것은 그 사람에게 도움이 되고 충실한 존재가 되고 또 어떤 일이 닥치더라도 고스란히 받아들이기 위해서다.",
-    "자기 결정을 구성하는 것이 무엇인지, 실패하면 어떻게 해서 실패하는 것인지도 알 수 없지요. 문학작품을 읽음으로써 이러한 현상이 어떻게 생성되는지에 대한 이해가 깊어가는 것은 자기 결정을 추구하고, 자신에게 중요한 것이 무엇인지, 어떤 사람이 되고 싶은지 자문하는 사람에게 결정적인 의미를 가집니다.",
+    "자기 결정을 구성하는 것이 무엇인지, 실패하면 어떻게 해서 실패하는 것인지도 알 수 있지요. 문학작품을 읽음으로써 이러한 현상이 어떻게 생성되는지에 대한 이해가 깊어가는 것은 자기 결정을 추구하고, 자신에게 중요한 것이 무엇인지, 어떤 사람이 되고 싶은지 자문하는 사람에게 결정적인 의미를 가집니다.",
     "행복하고 싶은데 그게 너무 어려운 날이 있다. 아무리 잘하려고 노력해도 상처받는 날이 있다. 하기 싫은 생각 속에서 하루 종일 불안하고 힘든 날이 있다. 지금 당장 여길 떠나고 싶지만 떠날 수 없다는 걸 누구보다 잘 알기에 속상한 날이 있다. 상대방에게 너무 심한 말을 하고 후회되는 날이 있다. 그런 날들은 참 어려운 날이다. 앞으로 행복하기 위해 도저히 어떻게 해야 될 지 몰라 참 어려운 날이다.",
     "자기 의지를 가지고 낯선 곳에 도착해 몸의 온갖 감각을 열어 그것을 느끼는 경험. 한 번이라도 그것을 경험한 이들에게는 일상이 아닌 여행이 인생의 원점이 된다. 일상으로 돌아올 때가 아니라 여행을 시작할 때 마음이 더 편해지는 사람이 있다면 그는 나와 같은 부류의 인간일 것이다. 이번 생은 떠돌면서 살 운명이라는 것. 귀환의 원점 같은 것은 없다는 것. 이제는 그걸 받아들이기로 한다."
 ]
 
-# 방별 유저 정보 관리 딕셔너리
 rooms = {}
 
 @app.route('/')
@@ -46,10 +45,7 @@ def handle_join(data):
     if room not in rooms:
         rooms[room] = {'users': {}, 'sentence': ''}
     
-    # 유저 등록 (진척도 0%)
     rooms[room]['users'][nickname] = 0
-    
-    # 해당 방의 모든 유저 목록 브로드캐스트
     emit('update_users', list(rooms[room]['users'].keys()), room=room)
     emit('update_progress', rooms[room]['users'], room=room)
 
@@ -59,22 +55,11 @@ def handle_start(data):
     if room in rooms and SENTENCES:
         selected_sentence = random.choice(SENTENCES)
         rooms[room]['sentence'] = selected_sentence
-        # 모든 유저의 진척도를 0으로 초기화
         for user in rooms[room]['users']:
             rooms[room]['users'][user] = 0
             
         emit('new_sentence', {'sentence': selected_sentence}, room=room)
         emit('update_progress', rooms[room]['users'], room=room)
-
-@socketio.on('update_progress')
-def handle_progress(data):
-    room = data['room']
-    progress = data['progress']
-    
-    # flask-socketio 환경에서 닉네임을 특정하기 위해 세션 대신 간이 매핑 또는 클라이언트 전달 방식 사용
-    # 여기서는 간소화를 위해 클라이언트가 보낸 닉네임 정보를 활용하거나 방 상태 업데이트
-    # 현재 접속 중인 소켓의 닉네임을 찾기 위해 전체 유저 업데이트 이벤트 활용
-    pass
 
 @socketio.on('user_progress')
 def handle_user_progress(data):
@@ -86,14 +71,16 @@ def handle_user_progress(data):
         rooms[room]['users'][nickname] = progress
         emit('update_progress', rooms[room]['users'], room=room)
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    # 연결 끊긴 유저 정리
-    for room in rooms:
-        disconnected_users = []
-        for user in list(rooms[room]['users'].keys()):
-            # 유저 퇴장 처리 로직 (소켓 세션 관리)
-            pass
+# 누군가 완주했을 때 다른 참가자들에게도 알림 전송
+@socketio.on('finish_game')
+def handle_finish(data):
+    room = data['room']
+    nickname = data['nickname']
+    cpm = data['cpm']
+    accuracy = data['accuracy']
+    
+    # 방에 있는 다른 모든 유저에게 완주 소식 브로드캐스트
+    emit('player_finished', {'nickname': nickname, 'cpm': cpm, 'accuracy': accuracy}, room=room)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)

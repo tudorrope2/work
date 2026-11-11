@@ -34,7 +34,7 @@ rooms = {}
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('game.html')  # index.html -> game.html 로 변경
 
 @socketio.on('join')
 def handle_join(data):

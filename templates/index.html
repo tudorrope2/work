@@ -110,7 +110,6 @@
         button:hover { background: #0284c7; }
         .hidden { display: none; }
 
-        /* 결과 모달 팝업 스타일 */
         #resultModal {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -147,7 +146,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- 게임 결과 모달 팝업 (기본 숨김) -->
         <div id="resultModal" class="hidden">
             <div class="modal-content">
                 <h3 id="modalTitle">🎉 완주 축하합니다!</h3>
@@ -160,7 +158,6 @@
 
         <h2>⚡ 실시간 타이핑 아레나</h2>
         
-        <!-- 로비 화면 -->
         <div id="lobby" class="box">
             <label style="display:block; margin-bottom:5px;">닉네임:</label>
             <input type="text" id="nicknameInput" placeholder="닉네임을 입력하세요" style="margin-bottom: 15px;">
@@ -169,19 +166,16 @@
             <button onclick="joinRoom()">방 입장하기</button>
         </div>
 
-        <!-- 게임 방 화면 -->
         <div id="gameRoom" class="hidden">
             <div class="stats">
                 <span id="roomInfo">방: -</span>
                 <span id="statDisplay">타수: 0 타/분 | 정확도: 100%</span>
             </div>
 
-            <!-- 접속자 목록 표시 -->
             <div class="user-list">
                 👥 접속한 참가자: <span id="userListDisplay">-</span>
             </div>
 
-            <!-- 글자 하이라이팅 영역 -->
             <div id="sentenceDisplay">"게임 시작" 버튼을 누르면 문장이 출제됩니다!</div>
 
             <div class="box">
@@ -235,7 +229,6 @@
             gameActive = true;
             startTime = new Date().getTime();
             
-            // 게임 시작 시 이전 팝업 무조건 닫기
             closeModal();
 
             const input = document.getElementById('typingInput');
@@ -299,8 +292,7 @@
 
             socket.emit('user_progress', { room: currentRoom, nickname: currentNickname, progress: progress });
 
-            // 완주 판정 (입력값이 비어있지 않고, 타겟 텍스트와 정확히 일치할 때만)
-            if (typed.length > 0 && typed.trim() === targetText.trim()) {
+            if (targetText.length > 0 && typed.trim() === targetText.trim()) {
                 gameActive = false;
                 document.getElementById('typingInput').disabled = true;
 

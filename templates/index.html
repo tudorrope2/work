@@ -6,8 +6,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         body {
-            background-color: #0f172a;
-            color: #f8fafc;
+            background-color: #f1f5f9;
+            color: #1e293b;
             font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
             display: flex;
             justify-content: center;
@@ -16,49 +16,52 @@
             margin: 0;
         }
         .container {
-            background: #1e293b;
+            background: #ffffff;
             padding: 30px;
             border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
             width: 700px;
+            border: 1px solid #e2e8f0;
         }
-        h2 { text-align: center; color: #38bdf8; margin-top: 0; }
+        h2 { text-align: center; color: #0284c7; margin-top: 0; }
         .box { margin-bottom: 20px; }
+        label { font-weight: 600; color: #475569; }
         input[type="text"] {
             width: 100%;
             padding: 12px;
             font-size: 16px;
-            background: #0f172a;
-            border: 1px solid #334155;
-            color: #fff;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            color: #1e293b;
             border-radius: 8px;
             box-sizing: border-box;
             outline: none;
         }
-        input[type="text"]:focus { border-color: #38bdf8; }
+        input[type="text"]:focus { border-color: #0ea5e9; background: #fff; }
         
         #sentenceDisplay {
             font-size: 18px;
-            line-height: 1.6;
-            background: #0f172a;
+            line-height: 1.8;
+            background: #f8fafc;
             padding: 20px;
             border-radius: 8px;
-            border: 1px solid #334155;
+            border: 1px solid #cbd5e1;
             word-break: break-all;
             margin-bottom: 15px;
             letter-spacing: 0.5px;
             min-height: 60px;
         }
-        .char-correct { color: #34d399; font-weight: bold; }
-        .char-incorrect { color: #f87171; background: rgba(248,113,113,0.2); }
-        .char-normal { color: #94a3b8; }
+        /* 글자 하이라이팅 스타일 (화이트 테마 가독성 최적화) */
+        .char-correct { color: #16a34a; font-weight: bold; background: #dcfce7; } /* 맞춘 글자 (초록빛 배경) */
+        .char-incorrect { color: #dc2626; font-weight: bold; background: #fee2e2; } /* 오타 (빨간빛 배경) */
+        .char-normal { color: #64748b; } /* 남은 글자 (회색) */
 
         .progress-container {
-            background: #0f172a;
+            background: #f1f5f9;
             border-radius: 8px;
             margin-bottom: 10px;
             overflow: hidden;
-            border: 1px solid #334155;
+            border: 1px solid #cbd5e1;
             padding: 3px;
         }
         .progress-bar {
@@ -71,7 +74,7 @@
             line-height: 22px;
             font-size: 12px;
             font-weight: bold;
-            color: #0f172a;
+            color: #ffffff;
             padding-right: 8px;
             box-sizing: border-box;
         }
@@ -79,17 +82,18 @@
             display: flex;
             justify-content: space-between;
             font-size: 14px;
-            color: #94a3b8;
+            color: #64748b;
             margin-bottom: 15px;
+            font-weight: 500;
         }
         .user-list {
-            background: #0f172a;
+            background: #f8fafc;
             padding: 10px 15px;
             border-radius: 8px;
-            border: 1px solid #334155;
+            border: 1px solid #cbd5e1;
             margin-bottom: 15px;
             font-size: 14px;
-            color: #cbd5e1;
+            color: #334155;
         }
         button {
             background: #0ea5e9;
@@ -101,6 +105,7 @@
             cursor: pointer;
             font-weight: bold;
             width: 100%;
+            transition: background 0.2s;
         }
         button:hover { background: #0284c7; }
         .hidden { display: none; }
@@ -140,7 +145,7 @@
 
             <button id="startBtn" onclick="startGame()">게임 시작</button>
 
-            <h3 style="margin-top: 20px; font-size: 15px; color: #cbd5e1; margin-bottom: 10px;">실시간 진척도</h3>
+            <h3 style="margin-top: 20px; font-size: 15px; color: #334155; margin-bottom: 10px;">실시간 진척도</h3>
             <div id="progressContainer"></div>
         </div>
     </div>
@@ -174,12 +179,10 @@
             socket.emit('start_game', { room: currentRoom });
         }
 
-        // 접속자 목록 갱신 수신
         socket.on("update_users", (users) => {
             document.getElementById('userListDisplay').innerText = users.join(', ');
         });
 
-        // 새 문장 출제 수신
         socket.on("new_sentence", (data) => {
             targetText = data.sentence;
             gameActive = true;
@@ -190,17 +193,24 @@
             input.disabled = false;
             input.focus();
 
-            renderSentence(0);
+            renderSentence(0, 0);
             document.getElementById('statDisplay').innerText = "타수: 0 타/분 | 정확도: 100%";
         });
 
-        function renderSentence(currentIndex) {
+        // 글자별 맞춤/오타 하이라이팅 렌더링
+        function renderSentence(typedLength, correctLength) {
             let html = '';
+            const typedVal = document.getElementById('typingInput').value;
+
             for (let i = 0; i < targetText.length; i++) {
-                if (i < currentIndex) {
-                    html += `<span class="char-correct">${targetText[i]}</span>`;
-                } else if (i === currentIndex) {
-                    html += `<span class="char-normal" style="text-decoration: underline; color: #38bdf8;">${targetText[i]}</span>`;
+                if (i < typedVal.length) {
+                    if (typedVal[i] === targetText[i]) {
+                        html += `<span class="char-correct">${targetText[i]}</span>`;
+                    } else {
+                        html += `<span class="char-incorrect">${targetText[i]}</span>`;
+                    }
+                } else if (i === typedVal.length) {
+                    html += `<span class="char-normal" style="text-decoration: underline; background: #e0f2fe; color: #0284c7;">${targetText[i]}</span>`;
                 } else {
                     html += `<span class="char-normal">${targetText[i]}</span>`;
                 }
@@ -215,17 +225,19 @@
             let correctCount = 0;
             let errorCount = 0;
 
+            // 앞에서부터 정확히 일치하는 글자 수 체크 (오타 발생 시점부터는 카운트 중지)
             for (let i = 0; i < typed.length; i++) {
                 if (i < targetText.length) {
                     if (typed[i] === targetText[i]) {
                         correctCount++;
                     } else {
                         errorCount++;
+                        break; // 오타가 나면 정확한 카운트 중단
                     }
                 }
             }
 
-            renderSentence(typed.length);
+            renderSentence(typed.length, correctCount);
 
             const currentTime = new Date().getTime();
             const elapsedMinutes = (currentTime - startTime) / 60000;
@@ -234,11 +246,10 @@
 
             document.getElementById('statDisplay').innerText = `타수: ${cpm} 타/분 | 정확도: ${accuracy}%`;
 
+            // 오직 정확하게 맞춘 글자 수(correctCount) 기준으로만 퍼센트 계산
             let progress = Math.floor((correctCount / targetText.length) * 100);
             if (progress > 100) progress = 100;
-            if (typed.length > 0 && progress === 0) progress = 1;
 
-            // 서버로 유저별 진척도 전송
             socket.emit('user_progress', { room: currentRoom, nickname: currentNickname, progress: progress });
 
             if (typed.trim() === targetText.trim()) {
@@ -248,7 +259,6 @@
             }
         }
 
-        // 실시간 진척도 바 갱신 수신
         socket.on("update_progress", (usersProgress) => {
             const container = document.getElementById('progressContainer');
             container.innerHTML = '';
@@ -256,7 +266,7 @@
                 let p = usersProgress[user];
                 container.innerHTML += `
                     <div style="margin-bottom: 8px;">
-                        <div style="font-size: 13px; margin-bottom: 3px; color: #cbd5e1;">${user}</div>
+                        <div style="font-size: 13px; margin-bottom: 3px; font-weight: 600; color: #334155;">${user}</div>
                         <div class="progress-container">
                             <div class="progress-bar" style="width: ${p}%;">${p}%</div>
                         </div>

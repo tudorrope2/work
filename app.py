@@ -1,98 +1,86 @@
-from flask import Flask, request, jsonify
-from datetime import datetime
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO, join_room, leave_room, emit
+import random
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-questions_db = []
-question_id_counter = 1
+# 연습할 샘플 문장 리스트
+SENTENCES = [
+    "Flask and WebSockets make real-time applications incredibly fun and interactive.",
+    "Containerization with Docker ensures your environment is consistent everywhere.",
+    "Practice typing every day to improve your speed and accuracy significantly.",
+    "Cloud deployment on AWS EC2 brings your project to the real world."
+]
 
-# [조회 & 검색 & 정렬 API]
-@app.route('/api/questions', methods=['GET'])
-def get_questions():
-    search_keyword = request.args.get('search', '').strip()
-    sort_type = request.args.get('sort', 'latest') # 기본값: 최신순
+# 방별 상태 관리 딕셔너리
+rooms_state = {}
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@socketio.on('join')
+def handle_join(data):
+    room = data.get('room', 'default')
+    username = data.get('username', '익명')
     
-    # 1. 검색어 필터링
-    filtered_questions = questions_db
-    if search_keyword:
-        filtered_questions = [q for q in questions_db if search_keyword in q['content']]
-        
-    # 2. 정렬 처리
-    if sort_type == 'likes':
-        # 공감순 정렬 (공감이 많고, 최신인 것 우선)
-        sorted_questions = sorted(filtered_questions, key=lambda x: (x['likes'], x['id']), reverse=True)
-    else:
-        # 최신순 정렬 (기본)
-        sorted_questions = filtered_questions[::-1]
-        
-    return jsonify(sorted_questions), 200
-
-# [작성 API] 카테고리 및 현재 시간 저장
-@app.route('/api/questions', methods=['POST'])
-def create_question():
-    global question_id_counter
-    data = request.get_json()
-    content = data.get('content', '').strip()
-    category = data.get('category', '기타')
-
-    if not content:
-        return jsonify({'error': '내용을 입력하세요.'}), 400
-
-    # 현재 시간을 'YYYY-MM-DD HH:MM' 형식으로 생성
-    current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
-
-    new_question = {
-        'id': question_id_counter,
-        'category': category,
-        'content': content,
-        'created_at': current_time,
-        'likes': 0,
-        'comments': []
+    join_room(room)
+    
+    if room not in rooms_state:
+        rooms_state[room] = {
+            'sentence': random.choice(SENTENCES),
+            'status': 'waiting', # waiting, playing, finished
+            'players': {}
+        }
+    
+    rooms_state[room]['players'][request.sid] = {
+        'username': username,
+        'progress': 0,
+        'finished': False
     }
-    questions_db.append(new_question)
-    question_id_counter += 1
-
-    return jsonify(new_question), 201
-
-# [삭제 API]
-@app.route('/api/questions/<int:q_id>', methods=['DELETE'])
-def delete_question(q_id):
-    global questions_db
-    initial_len = len(questions_db)
-    questions_db = [q for q in questions_db if q['id'] != q_id]
     
-    if len(questions_db) < initial_len:
-        return jsonify({'message': '삭제되었습니다.'}), 200
-    return jsonify({'error': '질문을 찾을 수 없습니다.'}), 404
+    # 방에 있는 모든 사람에게 현재 플레이어 목록 전송
+    emit('update_room', rooms_state[room], room=room)
 
-# [공감 API]
-@app.route('/api/questions/<int:q_id>/like', methods=['POST'])
-def like_question(q_id):
-    for q in questions_db:
-        if q['id'] == q_id:
-            q['likes'] += 1
-            return jsonify(q), 200
-    return jsonify({'error': '질문을 찾을 수 없습니다.'}), 404
-
-# [댓글 API]
-@app.route('/api/questions/<int:q_id>/comments', methods=['POST'])
-def add_comment(q_id):
-    data = request.get_json()
-    comment_content = data.get('content', '').strip()
-    
-    if not comment_content:
-        return jsonify({'error': '댓글을 입력하세요.'}), 400
-
-    for q in questions_db:
-        if q['id'] == q_id:
-            q['comments'].append(comment_content)
-            return jsonify(q), 201
+@socketio.on('start_game')
+def handle_start(data):
+    room = data.get('room')
+    if room in rooms_state:
+        rooms_state[room]['status'] = 'playing'
+        rooms_state[room]['sentence'] = random.choice(SENTENCES)
+        for sid in rooms_state[room]['players']:
+            rooms_state[room]['players'][sid]['progress'] = 0
+            rooms_state[room]['players'][sid]['finished'] = False
             
-    return jsonify({'error': '질문을 찾을 수 없습니다.'}), 404
+        emit('game_started', rooms_state[room], room=room)
 
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    return jsonify({'status': 'ok'}), 200
+@socketio.on('update_progress')
+def handle_progress(data):
+    room = data.get('room')
+    progress = data.get('progress', 0)
+    
+    if room in rooms_state and request.sid in rooms_state[room]['players']:
+        rooms_state[room]['players'][request.sid]['progress'] = progress
+        
+        # 100% 도달 시 승리 처리 체크
+        if progress >= 100 and not rooms_state[room]['players'][request.sid]['finished']:
+            rooms_state[room]['players'][request.sid]['finished'] = True
+            winner_name = rooms_state[room]['players'][request.sid]['username']
+            emit('game_over', {'winner': winner_name}, room=room)
+            
+        emit('update_room', rooms_state[room], room=room)
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    for room, state in list(rooms_state.items()):
+        if request.sid in state['players']:
+            del state['players'][request.sid]
+            if not state['players']:
+                del rooms_state[room] # 방에 사람이 없으면 방 폭파
+            else:
+                emit('update_room', state, room=room)
+            break
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    socketio.run(app, host='0.0.0.0', port=5000)

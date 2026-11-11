@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>실시간 멀티 타이핑 아레나</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; max-width: 700px; margin: 0 auto; padding: 20px; color: #333; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        h2 { text-align: center; color: #2c3e50; }
+        
+        .setup-screen, .game-screen { display: none; }
+        .setup-screen.active, .game-screen.active { display: block; }
+        
+        input[type="text"] { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+        .btn { background-color: #3498db; color: white; border: none; padding: 12px; border-radius: 6px; width: 100%; font-size: 16px; cursor: pointer; font-weight: bold; }
+        .btn:hover { background-color: #2980b9; }
+        
+        .target-box { background: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; font-size: 16px; margin-bottom: 20px; line-height: 1.5; word-break: break-all; }
+        
+        .player-bar { margin-bottom: 15px; }
+        .player-info { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
+        .progress-track { background: #eee; height: 12px; border-radius: 6px; overflow: hidden; }
+        .progress-fill { background: #2ecc71; height: 100%; width: 0%; transition: width 0.1s ease; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>⌨️ 실시간 멀티 타이핑 아레나</h2>
+
+        <!-- 입장 화면 -->
+        <div id="setupScreen" class="setup-screen active">
+            <input type="text" id="usernameInput" placeholder="닉네임을 입력하세요">
+            <input type="text" id="roomInput" placeholder="방 코드 입력 (예: room1)">
+            <button class="btn" onclick="joinRoom()">입장하기</button>
+        </div>
+
+        <!-- 게임 화면 -->
+        <div id="gameScreen" class="game-screen">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 id="roomTitle" style="margin: 0;">방: </h3>
+                <button class="btn" id="startBtn" style="width: auto; padding: 8px 15px;" onclick="startGame()">게임 시작</button>
+            </div>
+
+            <div class="target-box" id="targetSentence">방장이 게임을 시작하면 문장이 표시됩니다.</div>
+            
+            <input type="text" id="typingInput" placeholder="여기에 타이핑하세요..." disabled oninput="checkTyping()">
+
+            <h4 style="margin-top: 30px;">🏃‍♂️ 실시간 현황</h4>
+            <div id="playerList"></div>
+        </div>
+    </div>
+
+    <script>
+        let socket = io();
+        let currentRoom = '';
+        let myUsername = '';
+        let targetText = '';
+        let gameActive = false;
+
+        function joinRoom() {
+            myUsername = document.getElementById('usernameInput').value.trim();
+            currentRoom = document.getElementById('roomInput').value.trim();
+
+            if (!myUsername || !currentRoom) {
+                alert("닉네임과 방 코드를 모두 입력해주세요!");
+                return;
+            }
+
+            socket.emit('join', { username: myUsername, room: currentRoom });
+            
+            document.getElementById('setupScreen').classList.remove('active');
+            document.getElementById('gameScreen').classList.add('active');
+            document.getElementById('roomTitleinnerText').innerText = `방: ${currentRoom}`;
+        }
+
+        function startGame() {
+            socket.emit('start_game', { room: currentRoom });
+        }
+
+        socket.on('game_started', (data) => {
+            targetText = data.sentence;
+            document.getElementById('targetSentence').innerText = targetText;
+            const input = document.getElementById('typingInput');
+            input.value = '';
+            input.disabled = false;
+            input.focus();
+            gameActive = true;
+        });
+
+        function checkTyping() {
+            if (!gameActive) return;
+            const typed = document.getElementById('typingInput').value;
+            
+            // 진척도 계산 (%)
+            let progress = Math.floor((typed.length / targetText.length) * 100);
+            if (progress > 100) progress = 100;
+
+            socket.emit('update_progress', { room: currentRoom, progress: progress });
+
+            if (typed === targetText) {
+                gameActive = false;
+                document.getElementById('typingInput').disabled = true;
+            }
+        }
+
+        socket.on('update_room', (state) => {
+            targetText = state.sentence;
+            if (state.status === 'playing' && document.getElementById('targetSentence').innerText.includes('방장이')) {
+                document.getElementById('targetSentence').innerText = targetText;
+            }
+
+            const playerListDiv = document.getElementById('playerList');
+            playerListDiv.innerHTML = '';
+
+            for (let sid in state.players) {
+                let player = state.players[sid];
+                let div = document.createElement('div');
+                div.className = 'player-bar';
+                div.innerHTML = `
+                    <div class="player-info">
+                        <span>${player.username} ${player.finished ? '🎉 (완주!)' : ''}</span>
+                        <span>${player.progress}%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width: ${player.progress}%"></div>
+                    </div>
+                `;
+                playerListDiv.appendChild(div);
+            }
+        });
+
+        socket.on('game_over', (data) => {
+            alert(`🏆 게임 종료! 우승자: ${data.winner}님 축하합니다!`);
+            gameActive = false;
+            document.getElementById('typingInput').disabled = true;
+        });
+    </script>
+</body>
+</html>

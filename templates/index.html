@@ -3,157 +3,245 @@
 <head>
     <meta charset="UTF-8">
     <title>실시간 멀티 타이핑 아레나</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; max-width: 700px; margin: 0 auto; padding: 20px; color: #333; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        h2 { text-align: center; color: #2c3e50; }
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            width: 700px;
+        }
+        h2 { text-align: center; color: #38bdf8; margin-top: 0; }
+        .box { margin-bottom: 20px; }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: #fff;
+            border-radius: 8px;
+            box-sizing: border-box;
+            outline: none;
+        }
+        input[type="text"]:focus { border-color: #38bdf8; }
         
-        .setup-screen, .game-screen { display: none; }
-        .setup-screen.active, .game-screen.active { display: block; }
-        
-        input[type="text"] { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
-        .btn { background-color: #3498db; color: white; border: none; padding: 12px; border-radius: 6px; width: 100%; font-size: 16px; cursor: pointer; font-weight: bold; }
-        .btn:hover { background-color: #2980b9; }
-        
-        .target-box { background: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; font-size: 16px; margin-bottom: 20px; line-height: 1.5; word-break: break-all; }
-        
-        .player-bar { margin-bottom: 15px; }
-        .player-info { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
-        .progress-track { background: #eee; height: 12px; border-radius: 6px; overflow: hidden; }
-        .progress-fill { background: #2ecc71; height: 100%; width: 0%; transition: width 0.1s ease; }
+        /* 타이핑 문장 스타일링 */
+        #sentenceDisplay {
+            font-size: 20px;
+            line-height: 1.6;
+            background: #0f172a;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            word-break: break-all;
+            margin-bottom: 15px;
+            letter-spacing: 0.5px;
+        }
+        .char-correct { color: #34d399; font-weight: bold; } /* 맞춘 글자 (초록색) */
+        .char-incorrect { color: #f87171; background: rgba(248,113,113,0.2); } /* 오타 */
+        .char-normal { color: #94a3b8; } /* 남은 글자 (회색) */
+
+        /* 게이지바 스타일 */
+        .progress-container {
+            background: #0f172a;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            border: 1px solid #334155;
+            padding: 3px;
+        }
+        .progress-bar {
+            height: 22px;
+            background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+            width: 0%;
+            border-radius: 4px;
+            transition: width 0.1s linear;
+            text-align: right;
+            line-height: 22px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #0f172a;
+            padding-right: 8px;
+            box-sizing: border-box;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #94a3b8;
+            margin-bottom: 15px;
+        }
+        button {
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+        button:hover { background: #0284c7; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>⌨️ 실시간 멀티 타이핑 아레나</h2>
-
-        <!-- 입장 화면 -->
-        <div id="setupScreen" class="setup-screen active">
-            <input type="text" id="usernameInput" placeholder="닉네임을 입력하세요">
-            <input type="text" id="roomInput" placeholder="방 코드 입력 (예: room1)">
-            <button class="btn" onclick="joinRoom()">입장하기</button>
+    <div class="container">
+        <h2>⚡ 실시간 타이핑 아레나</h2>
+        
+        <!-- 로비 화면 -->
+        <div id="lobby" class="box">
+            <label>닉네임:</label>
+            <input type="text" id="nicknameInput" placeholder="닉네임을 입력하세요" style="margin-bottom: 10px;">
+            <label>방 코드:</label>
+            <input type="text" id="roomInput" placeholder="예: room1" value="room1" style="margin-bottom: 15px;">
+            <button onclick="joinRoom()">방 입장하기</button>
         </div>
 
         <!-- 게임 화면 -->
-        <div id="gameScreen" class="game-screen">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 id="roomTitle" style="margin: 0;">방: </h3>
-                <button class="btn" id="startBtn" style="width: auto; padding: 8px 15px;" onclick="startGame()">게임 시작</button>
+        <div id="gameRoom" class="hidden">
+            <div class="stats">
+                <span id="roomInfo">방: -</span>
+                <span id="statDisplay">타수: 0 타/분 | 정확도: 100%</span>
             </div>
 
-            <div class="target-box" id="targetSentence">방장이 게임을 시작하면 문장이 표시됩니다.</div>
-            
-            <input type="text" id="typingInput" placeholder="여기에 타이핑하세요..." disabled oninput="checkTyping()">
+            <!-- 글자 하이라이팅 영역 -->
+            <div id="sentenceDisplay">게임을 시작하면 문장이 표시됩니다.</div>
 
-            <h4 style="margin-top: 30px;">🏃‍♂️ 실시간 현황</h4>
-            <div id="playerList"></div>
+            <div class="box">
+                <input type="text" id="typingInput" placeholder="시작 버튼을 누르면 입력할 수 있습니다." disabled oninput="checkTyping()">
+            </div>
+
+            <button id="startBtn" onclick="startGame()">게임 시작</button>
+
+            <h3 style="margin-top: 25px; font-size: 16px; color: #cbd5e1;">실시간 진척도</h3>
+            <div id="progressContainer"></div>
         </div>
     </div>
 
     <script>
-        let socket = io();
+        const socket = io();
         let currentRoom = '';
-        let myUsername = '';
         let targetText = '';
         let gameActive = false;
+        let startTime = null;
 
         function joinRoom() {
-            myUsername = document.getElementById('usernameInput').value.trim();
-            currentRoom = document.getElementById('roomInput').value.trim();
-
-            if (!myUsername || !currentRoom) {
-                alert("닉네임과 방 코드를 모두 입력해주세요!");
+            const nickname = document.getElementById('nicknameInput').value.trim();
+            const room = document.getElementById('roomInput').value.trim();
+            if (!nickname || !room) {
+                alert('닉네임과 방 코드를 입력해주세요!');
                 return;
             }
-
-            socket.emit('join', { username: myUsername, room: currentRoom });
-            
-            document.getElementById('setupScreen').classList.remove('active');
-            document.getElementById('gameScreen').classList.add('active');
-            document.getElementById('roomTitleinnerText').innerText = `방: ${currentRoom}`;
+            currentRoom = room;
+            socket.emit('join', { nickname: nickname, room: room });
+            document.getElementById('lobby').classList.add('hidden');
+            document.getElementById('gameRoom').classList.remove('hidden');
+            document.getElementById('roomInfo').innerText = `방: ${room}`;
         }
 
         function startGame() {
             socket.emit('start_game', { room: currentRoom });
         }
 
-        socket.on('game_started', (data) => {
+        socket.ons("new_sentence", (data) => {
             targetText = data.sentence;
-            document.getElementById('targetSentence').innerText = targetText;
+            gameActive = true;
+            startTime = new Date().getTime(); // 게임 시작 시간 기록
+            
             const input = document.getElementById('typingInput');
             input.value = '';
             input.disabled = false;
             input.focus();
-            gameActive = true;
+
+            renderSentence(0);
+            document.getElementById('statDisplay').innerText = "타수: 0 타/분 | 정확도: 100%";
         });
+
+        // 화면에 문장을 글자별로 쪼개서 하이라이팅 입히기
+        function renderSentence(currentIndex) {
+            let html = '';
+            for (let i = 0; i < targetText.length; i++) {
+                if (i < currentIndex) {
+                    html += `<span class="char-correct">${targetText[i]}</span>`;
+                } else if (i === currentIndex) {
+                    html += `<span class="char-normal" style="text-decoration: underline; color: #38bdf8;">${targetText[i]}</span>`;
+                } else {
+                    html += `<span class="char-normal">${targetText[i]}</span>`;
+                }
+            }
+            document.getElementById('sentenceDisplay').innerHTML = html;
+        }
 
         function checkTyping() {
             if (!gameActive) return;
             const typed = document.getElementById('typingInput').value;
             
-            // 앞에서부터 정확히 일치하는 글자 수 계산
             let correctCount = 0;
+            let errorCount = 0;
+
             for (let i = 0; i < typed.length; i++) {
-                if (i < targetText.length && typed[i] === targetText[i]) {
-                    correctCount++;
-                } else {
-                    // 오타가 나도 멈추지 않고, 일치하는 글자까지만 카운트
-                    break;
+                if (i < targetText.length) {
+                    if (typed[i] === targetText[i]) {
+                        correctCount++;
+                    } else {
+                        errorCount++;
+                    }
                 }
             }
-            
-            // 퍼센트 계산 (0% ~ 100%)
-            let progress = 0;
-            if (targetText.length > 0) {
-                progress = Math.floor((correctCount / targetText.length) * 100);
-            }
-            if (progress > 100) progress = 100;
-            if (typed.length > 0 && progress === 0) {
-                // 글자를 치기 시작했다면 최소 1% 이상으로 시각적 피드백 제공
-                progress = Math.max(1, Math.floor((typed.length / targetText.length) * 100));
-            }
 
-            // 서버로 진척도 전송
+            renderSentence(typed.length);
+
+            // 실시간 타수 및 정확도 계산
+            const currentTime = new Date().getTime();
+            const elapsedMinutes = (currentTime - startTime) / 60000; // 분 단위
+            let cpm = elapsedMinutes > 0 ? Math.floor(correctCount / elapsedMinutes) : 0;
+            let accuracy = typed.length > 0 ? Math.max(0, Math.floor(((typed.length - errorCount) / typed.length) * 100)) : 100;
+
+            document.getElementById('statDisplay').innerText = `타수: ${cpm} 타/분 | 정확도: ${accuracy}%`;
+
+            // 진척도(%) 계산
+            let progress = Math.floor((correctCount / targetText.length) * 100);
+            if (progress > 100) progress = 100;
+            if (typed.length > 0 && progress === 0) progress = 1;
+
             socket.emit('update_progress', { room: currentRoom, progress: progress });
 
             // 완주 판정
             if (typed.trim() === targetText.trim()) {
                 gameActive = false;
                 document.getElementById('typingInput').disabled = true;
+                alert('🎉 완주하셨습니다!');
             }
         }
 
-        socket.on('update_room', (state) => {
-            targetText = state.sentence;
-            if (state.status === 'playing' && document.getElementById('targetSentence').innerText.includes('방장이')) {
-                document.getElementById('targetSentence').innerText = targetText;
-            }
-
-            const playerListDiv = document.getElementById('playerList');
-            playerListDiv.innerHTML = '';
-
-            for (let sid in state.players) {
-                let player = state.players[sid];
-                let div = document.createElement('div');
-                div.className = 'player-bar';
-                div.innerHTML = `
-                    <div class="player-info">
-                        <span>${player.username} ${player.finished ? '🎉 (완주!)' : ''}</span>
-                        <span>${player.progress}%</span>
-                    </div>
-                    <div class="progress-track">
-                        <div class="progress-fill" style="width: ${player.progress}%"></div>
+        socket.on("update_progress", (data) => {
+            const container = document.getElementById('progressContainer');
+            container.innerHTML = '';
+            for (let user in data) {
+                let p = data[user];
+                container.innerHTML += `
+                    <div style="margin-bottom: 8px;">
+                        <div style="font-size: 13px; margin-bottom: 3px; color: #cbd5e1;">${user}</div>
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: ${p}%;">${p}%</div>
+                        </div>
                     </div>
                 `;
-                playerListDiv.appendChild(div);
             }
-        });
-
-        socket.on('game_over', (data) => {
-            alert(`🏆 게임 종료! 우승자: ${data.winner}님 축하합니다!`);
-            gameActive = false;
-            document.getElementById('typingInput').disabled = true;
         });
     </script>
 </body>

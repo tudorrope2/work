@@ -37,9 +37,8 @@
         }
         input[type="text"]:focus { border-color: #38bdf8; }
         
-        /* 타이핑 문장 스타일링 */
         #sentenceDisplay {
-            font-size: 20px;
+            font-size: 18px;
             line-height: 1.6;
             background: #0f172a;
             padding: 20px;
@@ -48,12 +47,12 @@
             word-break: break-all;
             margin-bottom: 15px;
             letter-spacing: 0.5px;
+            min-height: 60px;
         }
-        .char-correct { color: #34d399; font-weight: bold; } /* 맞춘 글자 (초록색) */
-        .char-incorrect { color: #f87171; background: rgba(248,113,113,0.2); } /* 오타 */
-        .char-normal { color: #94a3b8; } /* 남은 글자 (회색) */
+        .char-correct { color: #34d399; font-weight: bold; }
+        .char-incorrect { color: #f87171; background: rgba(248,113,113,0.2); }
+        .char-normal { color: #94a3b8; }
 
-        /* 게이지바 스타일 */
         .progress-container {
             background: #0f172a;
             border-radius: 8px;
@@ -83,11 +82,20 @@
             color: #94a3b8;
             margin-bottom: 15px;
         }
+        .user-list {
+            background: #0f172a;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #334155;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #cbd5e1;
+        }
         button {
             background: #0ea5e9;
             color: white;
             border: none;
-            padding: 10px 20px;
+            padding: 12px 20px;
             font-size: 16px;
             border-radius: 8px;
             cursor: pointer;
@@ -104,30 +112,35 @@
         
         <!-- 로비 화면 -->
         <div id="lobby" class="box">
-            <label>닉네임:</label>
-            <input type="text" id="nicknameInput" placeholder="닉네임을 입력하세요" style="margin-bottom: 10px;">
-            <label>방 코드:</label>
-            <input type="text" id="roomInput" placeholder="예: room1" value="room1" style="margin-bottom: 15px;">
+            <label style="display:block; margin-bottom:5px;">닉네임:</label>
+            <input type="text" id="nicknameInput" placeholder="닉네임을 입력하세요" style="margin-bottom: 15px;">
+            <label style="display:block; margin-bottom:5px;">방 코드:</label>
+            <input type="text" id="roomInput" placeholder="예: room1" value="room1" style="margin-bottom: 20px;">
             <button onclick="joinRoom()">방 입장하기</button>
         </div>
 
-        <!-- 게임 화면 -->
+        <!-- 게임 방 화면 -->
         <div id="gameRoom" class="hidden">
             <div class="stats">
                 <span id="roomInfo">방: -</span>
                 <span id="statDisplay">타수: 0 타/분 | 정확도: 100%</span>
             </div>
 
+            <!-- 접속자 목록 표시 -->
+            <div class="user-list">
+                👥 접속한 참가자: <span id="userListDisplay">-</span>
+            </div>
+
             <!-- 글자 하이라이팅 영역 -->
-            <div id="sentenceDisplay">게임을 시작하면 문장이 표시됩니다.</div>
+            <div id="sentenceDisplay">"게임 시작" 버튼을 누르면 문장이 출제됩니다!</div>
 
             <div class="box">
-                <input type="text" id="typingInput" placeholder="시작 버튼을 누르면 입력할 수 있습니다." disabled oninput="checkTyping()">
+                <input type="text" id="typingInput" placeholder="시작 버튼을 누르면 타이핑할 수 있습니다." disabled oninput="checkTyping()">
             </div>
 
             <button id="startBtn" onclick="startGame()">게임 시작</button>
 
-            <h3 style="margin-top: 25px; font-size: 16px; color: #cbd5e1;">실시간 진척도</h3>
+            <h3 style="margin-top: 20px; font-size: 15px; color: #cbd5e1; margin-bottom: 10px;">실시간 진척도</h3>
             <div id="progressContainer"></div>
         </div>
     </div>
@@ -135,6 +148,7 @@
     <script>
         const socket = io();
         let currentRoom = '';
+        let currentNickname = '';
         let targetText = '';
         let gameActive = false;
         let startTime = null;
@@ -146,21 +160,30 @@
                 alert('닉네임과 방 코드를 입력해주세요!');
                 return;
             }
+            currentNickname = nickname;
             currentRoom = room;
+            
             socket.emit('join', { nickname: nickname, room: room });
+            
             document.getElementById('lobby').classList.add('hidden');
             document.getElementById('gameRoom').classList.remove('hidden');
-            document.getElementById('roomInfo').innerText = `방: ${room}`;
+            document.getElementById('roomInfo').innerText = `방: ${room} (${nickname}님)`;
         }
 
         function startGame() {
             socket.emit('start_game', { room: currentRoom });
         }
 
-        socket.ons("new_sentence", (data) => {
+        // 접속자 목록 갱신 수신
+        socket.on("update_users", (users) => {
+            document.getElementById('userListDisplay').innerText = users.join(', ');
+        });
+
+        // 새 문장 출제 수신
+        socket.on("new_sentence", (data) => {
             targetText = data.sentence;
             gameActive = true;
-            startTime = new Date().getTime(); // 게임 시작 시간 기록
+            startTime = new Date().getTime();
             
             const input = document.getElementById('typingInput');
             input.value = '';
@@ -171,7 +194,6 @@
             document.getElementById('statDisplay').innerText = "타수: 0 타/분 | 정확도: 100%";
         });
 
-        // 화면에 문장을 글자별로 쪼개서 하이라이팅 입히기
         function renderSentence(currentIndex) {
             let html = '';
             for (let i = 0; i < targetText.length; i++) {
@@ -205,22 +227,20 @@
 
             renderSentence(typed.length);
 
-            // 실시간 타수 및 정확도 계산
             const currentTime = new Date().getTime();
-            const elapsedMinutes = (currentTime - startTime) / 60000; // 분 단위
+            const elapsedMinutes = (currentTime - startTime) / 60000;
             let cpm = elapsedMinutes > 0 ? Math.floor(correctCount / elapsedMinutes) : 0;
             let accuracy = typed.length > 0 ? Math.max(0, Math.floor(((typed.length - errorCount) / typed.length) * 100)) : 100;
 
             document.getElementById('statDisplay').innerText = `타수: ${cpm} 타/분 | 정확도: ${accuracy}%`;
 
-            // 진척도(%) 계산
             let progress = Math.floor((correctCount / targetText.length) * 100);
             if (progress > 100) progress = 100;
             if (typed.length > 0 && progress === 0) progress = 1;
 
-            socket.emit('update_progress', { room: currentRoom, progress: progress });
+            // 서버로 유저별 진척도 전송
+            socket.emit('user_progress', { room: currentRoom, nickname: currentNickname, progress: progress });
 
-            // 완주 판정
             if (typed.trim() === targetText.trim()) {
                 gameActive = false;
                 document.getElementById('typingInput').disabled = true;
@@ -228,11 +248,12 @@
             }
         }
 
-        socket.on("update_progress", (data) => {
+        // 실시간 진척도 바 갱신 수신
+        socket.on("update_progress", (usersProgress) => {
             const container = document.getElementById('progressContainer');
             container.innerHTML = '';
-            for (let user in data) {
-                let p = data[user];
+            for (let user in usersProgress) {
+                let p = usersProgress[user];
                 container.innerHTML += `
                     <div style="margin-bottom: 8px;">
                         <div style="font-size: 13px; margin-bottom: 3px; color: #cbd5e1;">${user}</div>

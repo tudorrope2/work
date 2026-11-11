@@ -110,6 +110,7 @@
         button:hover { background: #0284c7; }
         .hidden { display: none; }
 
+        /* 결과 모달 팝업 */
         #resultModal {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -146,6 +147,7 @@
 </head>
 <body>
     <div class="container">
+        <!-- 결과 팝업 모달 -->
         <div id="resultModal" class="hidden">
             <div class="modal-content">
                 <h3 id="modalTitle">🎉 완주 축하합니다!</h3>
@@ -158,6 +160,7 @@
 
         <h2>⚡ 실시간 타이핑 아레나</h2>
         
+        <!-- 로비 화면 -->
         <div id="lobby" class="box">
             <label style="display:block; margin-bottom:5px;">닉네임:</label>
             <input type="text" id="nicknameInput" placeholder="닉네임을 입력하세요" style="margin-bottom: 15px;">
@@ -166,6 +169,7 @@
             <button onclick="joinRoom()">방 입장하기</button>
         </div>
 
+        <!-- 게임 방 화면 -->
         <div id="gameRoom" class="hidden">
             <div class="stats">
                 <span id="roomInfo">방: -</span>
@@ -261,7 +265,7 @@
         }
 
         function checkTyping() {
-            if (!gameActive) return;
+            if (!gameActive || !targetText) return;
             const typed = document.getElementById('typingInput').value;
             
             let correctCount = 0;
@@ -292,7 +296,8 @@
 
             socket.emit('user_progress', { room: currentRoom, nickname: currentNickname, progress: progress });
 
-            if (targetText.length > 0 && typed.trim() === targetText.trim()) {
+            // 문장이 실제로 출제되어 있고, 입력값이 빈칸이 아니며 정확히 완주했을 때만 실행
+            if (targetText.length > 0 && typed.length > 0 && typed.trim() === targetText.trim()) {
                 gameActive = false;
                 document.getElementById('typingInput').disabled = true;
 

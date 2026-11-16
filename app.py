@@ -86,6 +86,17 @@ def handle_finish(data):
     if room in rooms:
         rooms[room]['is_playing'] = False  # 게임 종료 상태 전환
         emit('player_finished', {'nickname': nickname, 'cpm': cpm, 'accuracy': accuracy}, room=room)
-
+@socketio.on('leave')
+def handle_leave(data):
+    nickname = data['nickname']
+    room = data['room']
+    if room in rooms and nickname in rooms[room]['users']:
+        del rooms[room]['users'][nickname]
+        # 방에 아무도 안 남았으면 진행 상태 초기화
+        if len(rooms[room]['users']) == 0:
+            rooms[room]['is_playing'] = False
+        emit('update_users', list(rooms[room]['users'].keys()), room=room)
+        emit('update_progress', rooms[room]['users'], room=room)
+        
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)

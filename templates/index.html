@@ -78,6 +78,12 @@
             padding-right: 8px;
             box-sizing: border-box;
         }
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
         .stats {
             display: flex;
             justify-content: space-between;
@@ -108,6 +114,19 @@
             transition: background 0.2s;
         }
         button:hover { background: #0284c7; }
+        
+        /* 메인으로 돌아가기(방 나가기) 소형 버튼 */
+        .btn-leave {
+            width: auto;
+            padding: 6px 12px;
+            font-size: 13px;
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .btn-leave:hover {
+            background: #cbd5e1;
+            color: #1e293b;
+        }
         .hidden { display: none !important; }
 
         #resultModal {
@@ -170,8 +189,13 @@
 
         <!-- 게임 방 화면 -->
         <div id="gameRoom" class="hidden">
+            <div class="top-bar">
+                <span id="roomInfo" style="font-weight: 600; color: #0284c7;">방: -</span>
+                <button class="btn-leave" onclick="leaveRoom()">🚪 메인으로 나가기</button>
+            </div>
+
             <div class="stats">
-                <span id="roomInfo">방: -</span>
+                <span>실시간 기록</span>
                 <span id="statDisplay">타수: 0 타/분 | 정확도: 100%</span>
             </div>
 
@@ -185,7 +209,7 @@
                 <input type="text" id="typingInput" placeholder="시작 버튼을 누르면 타이핑할 수 있습니다." disabled oninput="checkTyping()">
             </div>
 
-            <!-- 시작 / 재시작 버튼 영역 -->
+            <!-- 처음 입장 시 "게임 시작"으로 표시 -->
             <button id="startBtn" onclick="startGame()">게임 시작</button>
 
             <h3 style="margin-top: 20px; font-size: 15px; color: #334155; margin-bottom: 10px;">실시간 진척도</h3>
@@ -199,13 +223,10 @@
         let currentNickname = '';
         let targetText = '';
         let gameActive = false;
+        let hasPlayedOnce = false; // 한 판이라도 진행했는지 여부 추적
         let startTime = null;
         let finalCpm = 0;
         let finalAccuracy = 100;
-
-        document.addEventListener("DOMContentLoaded", () => {
-            closeModal();
-        });
 
         function joinRoom() {
             const nickname = document.getElementById('nicknameInput').value.trim();
@@ -216,12 +237,41 @@
             }
             currentNickname = nickname;
             currentRoom = room;
+            hasPlayedOnce = false;
+            gameActive = false;
+            targetText = '';
             
+            // 방 입장 시 UI 초기화
+            const startBtn = document.getElementById('startBtn');
+            startBtn.innerText = "게임 시작";
+            startBtn.classList.remove('hidden');
+            
+            document.getElementById('sentenceDisplay').innerText = '"게임 시작" 버튼을 누르면 문장이 출제됩니다!';
+            document.getElementById('statDisplay').innerText = "타수: 0 타/분 | 정확도: 100%";
+            const input = document.getElementById('typingInput');
+            input.value = '';
+            input.disabled = true;
+
             socket.emit('join', { nickname: nickname, room: room });
             
             document.getElementById('lobby').classList.add('hidden');
             document.getElementById('gameRoom').classList.remove('hidden');
             document.getElementById('roomInfo').innerText = `방: ${room} (${nickname}님)`;
+        }
+
+        // 메인 페이지(로비)로 돌아가기
+        function leaveRoom() {
+            if (currentRoom && currentNickname) {
+                socket.emit('leave', { nickname: currentNickname, room: currentRoom });
+            }
+            gameActive = false;
+            hasPlayedOnce = false;
+            targetText = '';
+            currentRoom = '';
+            
+            document.getElementById('resultModal').classList.add('hidden');
+            document.getElementById('gameRoom').classList.add('hidden');
+            document.getElementById('lobby').classList.remove('hidden');
         }
 
         function startGame() {
@@ -232,15 +282,14 @@
             document.getElementById('userListDisplay').innerText = users.join(', ');
         });
 
-        // 게임 시작 수신 처리 (버튼 숨김 적용)
         socket.on("game_started", (data) => {
             targetText = data.sentence;
             gameActive = true;
+            hasPlayedOnce = true;
             startTime = new Date().getTime();
             
-            closeModal();
+            document.getElementById('resultModal').classList.add('hidden');
 
-            // 게임 시작 시 버튼 숨기기
             const startBtn = document.getElementById('startBtn');
             startBtn.classList.add('hidden');
 
@@ -322,6 +371,8 @@
 
         socket.on("player_finished", (data) => {
             if (data.nickname !== currentNickname) {
+                gameActive = false;
+                document.getElementById('typingInput').disabled = true;
                 showModal(`🏆 ${data.nickname}님 완주 완료!`, `상대방 기록<br>타수: ${data.cpm} 타/분 | 정확도: ${data.accuracy}%`);
             }
         });
@@ -335,8 +386,8 @@
         function closeModal() {
             document.getElementById('resultModal').classList.add('hidden');
             
-            // 게임이 시작 상태가 아닐 때(종료/대기)만 버튼을 "게임 재시작" 상태로 복구
-            if (!gameActive) {
+            // 한 판 이상 진행했고 게임이 끝난 상태일 때만 "게임 재시작" 버튼 노출
+            if (!gameActive && hasPlayedOnce) {
                 const startBtn = document.getElementById('startBtn');
                 startBtn.innerText = "🔄 게임 재시작";
                 startBtn.classList.remove('hidden');

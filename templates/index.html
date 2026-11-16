@@ -2,218 +2,402 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>실시간 멀티 타이핑 아레나</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>typing.arena</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
     <style>
+        :root {
+            --bg: #fafafa;
+            --surface: #ffffff;
+            --text-primary: #18181b;
+            --text-secondary: #71717a;
+            --text-muted: #a1a1aa;
+            --border: #e4e4e7;
+            --accent: #18181b;
+            --error: #dc2626;
+            --error-bg: #fef2f2;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            background-color: #f1f5f9;
-            color: #1e293b;
-            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-primary);
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
+            min-height: 100vh;
+            padding: 24px;
+            -webkit-font-smoothing: antialiased;
         }
-        .container {
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-            width: 700px;
-            border: 1px solid #e2e8f0;
-            position: relative;
-        }
-        h2 { text-align: center; color: #0284c7; margin-top: 0; }
-        .box { margin-bottom: 20px; }
-        label { font-weight: 600; color: #475569; }
-        input[type="text"] {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            background: #f8fafc;
-            border: 1px solid #cbd5e1;
-            color: #1e293b;
-            border-radius: 8px;
-            box-sizing: border-box;
-            outline: none;
-        }
-        input[type="text"]:focus { border-color: #0ea5e9; background: #fff; }
-        
-        #sentenceDisplay {
-            font-size: 18px;
-            line-height: 1.8;
-            background: #f8fafc;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #cbd5e1;
-            word-break: break-all;
-            margin-bottom: 15px;
-            letter-spacing: 0.5px;
-            min-height: 60px;
-        }
-        .char-correct { color: #16a34a; font-weight: bold; background: #dcfce7; }
-        .char-incorrect { color: #dc2626; font-weight: bold; background: #fee2e2; }
-        .char-normal { color: #64748b; }
 
-        .progress-container {
-            background: #f1f5f9;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            overflow: hidden;
-            border: 1px solid #cbd5e1;
-            padding: 3px;
+        .wrapper {
+            width: 100%;
+            max-width: 720px;
         }
-        .progress-bar {
-            height: 22px;
-            background: linear-gradient(90deg, #0ea5e9, #38bdf8);
-            width: 0%;
-            border-radius: 4px;
-            transition: width 0.1s linear;
-            text-align: right;
-            line-height: 22px;
+
+        /* 상단 헤더 */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 48px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .brand {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .brand span {
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* 로비 화면 */
+        .lobby-box {
+            max-width: 360px;
+            margin: 0 auto;
+        }
+
+        .lobby-title {
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+        }
+
+        .lobby-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        .field {
+            margin-bottom: 20px;
+        }
+
+        .field label {
+            display: block;
             font-size: 12px;
-            font-weight: bold;
-            color: #ffffff;
-            padding-right: 8px;
-            box-sizing: border-box;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
         }
-        .top-bar {
+
+        .field input {
+            width: 100%;
+            padding: 11px 14px;
+            font-size: 15px;
+            font-family: inherit;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .field input:focus {
+            border-color: var(--text-primary);
+        }
+
+        /* 버튼 스타일 */
+        .btn {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            padding: 11px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            font-family: inherit;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            width: 100%;
+            background: var(--accent);
+            color: #ffffff;
+        }
+
+        .btn-primary:hover {
+            background: #27272a;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 6px 10px;
+            font-size: 13px;
+        }
+
+        .btn-ghost:hover {
+            color: var(--text-primary);
+            background: #f4f4f5;
+        }
+
+        .btn-outline {
+            background: var(--surface);
+            border-color: var(--border);
+            color: var(--text-primary);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--text-primary);
+        }
+
+        /* 게임 방 메타 정보 */
+        .room-meta {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 32px;
+            font-size: 13px;
+            color: var(--text-secondary);
         }
-        .stats {
+
+        .metrics {
+            display: flex;
+            gap: 24px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .metric-item strong {
+            color: var(--text-primary);
+            font-weight: 600;
+            margin-left: 6px;
+        }
+
+        /* 타이핑 영역 (typing.works 스타일) */
+        .typing-area {
+            position: relative;
+            margin-bottom: 32px;
+            cursor: text;
+        }
+
+        #sentenceDisplay {
+            font-size: 21px;
+            line-height: 1.85;
+            letter-spacing: -0.01em;
+            color: var(--text-muted);
+            word-break: keep-all;
+            min-height: 120px;
+            user-select: none;
+        }
+
+        .char-correct {
+            color: var(--text-primary);
+        }
+
+        .char-incorrect {
+            color: var(--error);
+            background-color: var(--error-bg);
+            border-radius: 2px;
+        }
+
+        .char-current {
+            position: relative;
+            color: var(--text-muted);
+        }
+
+        .char-current::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 3px;
+            bottom: 3px;
+            width: 2px;
+            background-color: var(--text-primary);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        /* 화면에 보이지 않는 실제 입력창 */
+        #hiddenInput {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            width: 1px;
+            height: 1px;
+        }
+
+        .focus-hint {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 12px;
+            height: 18px;
+        }
+
+        /* 인라인 결과 배너 */
+        .result-banner {
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 32px;
+        }
+
+        .result-info {
             font-size: 14px;
-            color: #64748b;
-            margin-bottom: 15px;
+        }
+
+        .result-info .winner {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .result-info .detail {
+            color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 참가자 및 실시간 진척도 */
+        .participants-section {
+            border-top: 1px solid var(--border);
+            padding-top: 24px;
+        }
+
+        .section-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .player-row {
+            margin-bottom: 14px;
+        }
+
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 6px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .player-name {
+            color: var(--text-primary);
             font-weight: 500;
         }
-        .user-list {
-            background: #f8fafc;
-            padding: 10px 15px;
-            border-radius: 8px;
-            border: 1px solid #cbd5e1;
-            margin-bottom: 15px;
-            font-size: 14px;
-            color: #334155;
-        }
-        button {
-            background: #0ea5e9;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            font-size: 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            width: 100%;
-            transition: background 0.2s;
-        }
-        button:hover { background: #0284c7; }
-        
-        /* 메인으로 돌아가기(방 나가기) 소형 버튼 */
-        .btn-leave {
-            width: auto;
-            padding: 6px 12px;
-            font-size: 13px;
-            background: #e2e8f0;
-            color: #475569;
-        }
-        .btn-leave:hover {
-            background: #cbd5e1;
-            color: #1e293b;
-        }
-        .hidden { display: none !important; }
 
-        #resultModal {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(4px);
+        .player-pct {
+            color: var(--text-secondary);
+        }
+
+        .track {
+            width: 100%;
+            height: 2px;
+            background: var(--border);
+            overflow: hidden;
+        }
+
+        .fill {
+            height: 100%;
+            background: var(--text-primary);
+            width: 0%;
+            transition: width 0.12s ease-out;
+        }
+
+        .control-bar {
             display: flex;
-            justify-content: center;
-            align-items: center;
-            border-radius: 16px;
-            z-index: 100;
+            justify-content: flex-end;
+            margin-bottom: 24px;
         }
-        .modal-content {
-            background: #ffffff;
-            padding: 35px;
-            border-radius: 16px;
-            text-align: center;
-            width: 350px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
-            border: 1px solid #cbd5e1;
-        }
-        .modal-content h3 { color: #0284c7; margin-top: 0; font-size: 24px; }
-        .result-stat-box {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            font-size: 16px;
-            color: #334155;
-            font-weight: 600;
-            line-height: 1.6;
+
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- 결과 팝업 모달 -->
-        <div id="resultModal" class="hidden">
-            <div class="modal-content">
-                <h3 id="modalTitle">🎉 완주 축하합니다!</h3>
-                <div class="result-stat-box" id="modalStatText">
-                    타수: 0 타/분<br>정확도: 0%
-                </div>
-                <button onclick="closeModal()">확인</button>
+    <div class="wrapper">
+        <header>
+            <div class="brand">typing.arena <span>/ multiplayer</span></div>
+            <div id="headerAction" class="hidden">
+                <button class="btn btn-ghost" onclick="leaveRoom()">나가기</button>
             </div>
-        </div>
+        </header>
 
-        <h2>⚡ 실시간 타이핑 아레나</h2>
-        
         <!-- 로비 화면 -->
-        <div id="lobby" class="box">
-            <label style="display:block; margin-bottom:5px;">닉네임:</label>
-            <input type="text" id="nicknameInput" placeholder="닉네임을 입력하세요" style="margin-bottom: 15px;">
-            <label style="display:block; margin-bottom:5px;">방 코드:</label>
-            <input type="text" id="roomInput" placeholder="예: room1" value="room1" style="margin-bottom: 20px;">
-            <button onclick="joinRoom()">방 입장하기</button>
+        <div id="lobby" class="lobby-box">
+            <div class="lobby-title">방 입장</div>
+            <div class="lobby-desc">동일한 방 코드를 입력해 실시간으로 문장을 입력합니다.</div>
+
+            <div class="field">
+                <label for="nicknameInput">닉네임</label>
+                <input type="text" id="nicknameInput" placeholder="표시될 이름" autocomplete="off">
+            </div>
+
+            <div class="field">
+                <label for="roomInput">방 코드</label>
+                <input type="text" id="roomInput" value="room1" placeholder="예: room1" autocomplete="off">
+            </div>
+
+            <button class="btn btn-primary" onclick="joinRoom()">입장하기</button>
         </div>
 
         <!-- 게임 방 화면 -->
         <div id="gameRoom" class="hidden">
-            <div class="top-bar">
-                <span id="roomInfo" style="font-weight: 600; color: #0284c7;">방: -</span>
-                <button class="btn-leave" onclick="leaveRoom()">🚪 메인으로 나가기</button>
+            <div class="room-meta">
+                <div id="roomInfo">room1 · -</div>
+                <div class="metrics">
+                    <div class="metric-item">타수<strong id="cpmDisplay">0</strong></div>
+                    <div class="metric-item">정확도<strong id="accDisplay">100%</strong></div>
+                </div>
             </div>
 
-            <div class="stats">
-                <span>실시간 기록</span>
-                <span id="statDisplay">타수: 0 타/분 | 정확도: 100%</span>
+            <!-- 완주 결과 인라인 배너 -->
+            <div id="resultBanner" class="result-banner hidden">
+                <div class="result-info">
+                    <div class="winner" id="resultTitle">-</div>
+                    <div class="detail" id="resultDetail">-</div>
+                </div>
+                <button class="btn btn-outline" onclick="startGame()">다시 시작</button>
             </div>
 
-            <div class="user-list">
-                👥 접속한 참가자: <span id="userListDisplay">-</span>
+            <!-- 문장 출력 및 인라인 타이핑 영역 -->
+            <div class="typing-area" onclick="focusInput()">
+                <div id="sentenceDisplay">시작 버튼을 누르면 문장이 표시됩니다.</div>
+                <input type="text" id="hiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled oninput="checkTyping()">
+                <div class="focus-hint" id="focusHint"></div>
             </div>
 
-            <div id="sentenceDisplay">"게임 시작" 버튼을 누르면 문장이 출제됩니다!</div>
-
-            <div class="box">
-                <input type="text" id="typingInput" placeholder="시작 버튼을 누르면 타이핑할 수 있습니다." disabled oninput="checkTyping()">
+            <div class="control-bar">
+                <button id="startBtn" class="btn btn-outline" onclick="startGame()">게임 시작</button>
             </div>
 
-            <!-- 처음 입장 시 "게임 시작"으로 표시 -->
-            <button id="startBtn" onclick="startGame()">게임 시작</button>
-
-            <h3 style="margin-top: 20px; font-size: 15px; color: #334155; margin-bottom: 10px;">실시간 진척도</h3>
-            <div id="progressContainer"></div>
+            <!-- 실시간 진척도 -->
+            <div class="participants-section">
+                <div class="section-label">
+                    <span>참가자 진척도</span>
+                    <span id="userCount">0명</span>
+                </div>
+                <div id="progressContainer"></div>
+            </div>
         </div>
     </div>
 
@@ -223,16 +407,34 @@
         let currentNickname = '';
         let targetText = '';
         let gameActive = false;
-        let hasPlayedOnce = false; // 한 판이라도 진행했는지 여부 추적
+        let hasPlayedOnce = false;
         let startTime = null;
         let finalCpm = 0;
         let finalAccuracy = 100;
+
+        const hiddenInput = document.getElementById('hiddenInput');
+
+        // 포커스 안내 문구 제어
+        hiddenInput.addEventListener('blur', () => {
+            if (gameActive) {
+                document.getElementById('focusHint').innerText = '계속 입력하려면 문장 영역을 클릭하세요.';
+            }
+        });
+        hiddenInput.addEventListener('focus', () => {
+            document.getElementById('focusHint').innerText = '';
+        });
+
+        function focusInput() {
+            if (gameActive) {
+                hiddenInput.focus();
+            }
+        }
 
         function joinRoom() {
             const nickname = document.getElementById('nicknameInput').value.trim();
             const room = document.getElementById('roomInput').value.trim();
             if (!nickname || !room) {
-                alert('닉네임과 방 코드를 입력해주세요!');
+                alert('닉네임과 방 코드를 입력해주세요.');
                 return;
             }
             currentNickname = nickname;
@@ -240,26 +442,28 @@
             hasPlayedOnce = false;
             gameActive = false;
             targetText = '';
-            
-            // 방 입장 시 UI 초기화
+
             const startBtn = document.getElementById('startBtn');
-            startBtn.innerText = "게임 시작";
+            startBtn.innerText = '게임 시작';
             startBtn.classList.remove('hidden');
-            
-            document.getElementById('sentenceDisplay').innerText = '"게임 시작" 버튼을 누르면 문장이 출제됩니다!';
-            document.getElementById('statDisplay').innerText = "타수: 0 타/분 | 정확도: 100%";
-            const input = document.getElementById('typingInput');
-            input.value = '';
-            input.disabled = true;
+
+            document.getElementById('resultBanner').classList.add('hidden');
+            document.getElementById('sentenceDisplay').innerText = '시작 버튼을 누르면 문장이 표시됩니다.';
+            document.getElementById('cpmDisplay').innerText = '0';
+            document.getElementById('accDisplay').innerText = '100%';
+            document.getElementById('focusHint').innerText = '';
+
+            hiddenInput.value = '';
+            hiddenInput.disabled = true;
 
             socket.emit('join', { nickname: nickname, room: room });
-            
+
             document.getElementById('lobby').classList.add('hidden');
             document.getElementById('gameRoom').classList.remove('hidden');
-            document.getElementById('roomInfo').innerText = `방: ${room} (${nickname}님)`;
+            document.getElementById('headerAction').classList.remove('hidden');
+            document.getElementById('roomInfo').innerText = `${room} · ${nickname}`;
         }
 
-        // 메인 페이지(로비)로 돌아가기
         function leaveRoom() {
             if (currentRoom && currentNickname) {
                 socket.emit('leave', { nickname: currentNickname, room: currentRoom });
@@ -268,9 +472,10 @@
             hasPlayedOnce = false;
             targetText = '';
             currentRoom = '';
-            
-            document.getElementById('resultModal').classList.add('hidden');
+
+            document.getElementById('resultBanner').classList.add('hidden');
             document.getElementById('gameRoom').classList.add('hidden');
+            document.getElementById('headerAction').classList.add('hidden');
             document.getElementById('lobby').classList.remove('hidden');
         }
 
@@ -278,45 +483,45 @@
             socket.emit('start_game', { room: currentRoom });
         }
 
-        socket.on("update_users", (users) => {
-            document.getElementById('userListDisplay').innerText = users.join(', ');
+        socket.on('update_users', (users) => {
+            document.getElementById('userCount').innerText = `${users.length}명`;
         });
 
-        socket.on("game_started", (data) => {
+        socket.on('game_started', (data) => {
             targetText = data.sentence;
             gameActive = true;
             hasPlayedOnce = true;
             startTime = new Date().getTime();
-            
-            document.getElementById('resultModal').classList.add('hidden');
 
-            const startBtn = document.getElementById('startBtn');
-            startBtn.classList.add('hidden');
+            document.getElementById('resultBanner').classList.add('hidden');
+            document.getElementById('startBtn').classList.add('hidden');
+            document.getElementById('focusHint').innerText = '';
 
-            const input = document.getElementById('typingInput');
-            input.value = '';
-            input.disabled = false;
-            input.focus();
+            hiddenInput.value = '';
+            hiddenInput.disabled = false;
+            hiddenInput.focus();
 
-            renderSentence(0, 0);
-            document.getElementById('statDisplay').innerText = "타수: 0 타/분 | 정확도: 100%";
+            renderSentence();
+            document.getElementById('cpmDisplay').innerText = '0';
+            document.getElementById('accDisplay').innerText = '100%';
         });
 
-        function renderSentence(typedLength, correctLength) {
+        function renderSentence() {
             let html = '';
-            const typedVal = document.getElementById('typingInput').value;
+            const typedVal = hiddenInput.value;
 
             for (let i = 0; i < targetText.length; i++) {
+                const char = targetText[i] === ' ' ? '&nbsp;' : targetText[i];
                 if (i < typedVal.length) {
                     if (typedVal[i] === targetText[i]) {
-                        html += `<span class="char-correct">${targetText[i]}</span>`;
+                        html += `<span class="char-correct">${char}</span>`;
                     } else {
-                        html += `<span class="char-incorrect">${targetText[i]}</span>`;
+                        html += `<span class="char-incorrect">${char}</span>`;
                     }
                 } else if (i === typedVal.length) {
-                    html += `<span class="char-normal" style="text-decoration: underline; background: #e0f2fe; color: #0284c7;">${targetText[i]}</span>`;
+                    html += `<span class="char-current">${char}</span>`;
                 } else {
-                    html += `<span class="char-normal">${targetText[i]}</span>`;
+                    html += `<span>${char}</span>`;
                 }
             }
             document.getElementById('sentenceDisplay').innerHTML = html;
@@ -324,8 +529,8 @@
 
         function checkTyping() {
             if (!gameActive || !targetText) return;
-            const typed = document.getElementById('typingInput').value;
-            
+            const typed = hiddenInput.value;
+
             let correctCount = 0;
             let errorCount = 0;
 
@@ -340,14 +545,15 @@
                 }
             }
 
-            renderSentence(typed.length, correctCount);
+            renderSentence();
 
             const currentTime = new Date().getTime();
             const elapsedMinutes = (currentTime - startTime) / 60000;
             finalCpm = elapsedMinutes > 0 ? Math.floor(correctCount / elapsedMinutes) : 0;
             finalAccuracy = typed.length > 0 ? Math.max(0, Math.floor(((typed.length - errorCount) / typed.length) * 100)) : 100;
 
-            document.getElementById('statDisplay').innerText = `타수: ${finalCpm} 타/분 | 정확도: ${finalAccuracy}%`;
+            document.getElementById('cpmDisplay').innerText = finalCpm;
+            document.getElementById('accDisplay').innerText = `${finalAccuracy}%`;
 
             let progress = Math.floor((correctCount / targetText.length) * 100);
             if (progress > 100) progress = 100;
@@ -356,54 +562,46 @@
 
             if (targetText.length > 0 && typed.length > 0 && typed.trim() === targetText.trim()) {
                 gameActive = false;
-                document.getElementById('typingInput').disabled = true;
+                hiddenInput.disabled = true;
 
-                socket.emit('finish_game', { 
-                    room: currentRoom, 
-                    nickname: currentNickname, 
-                    cpm: finalCpm, 
-                    accuracy: finalAccuracy 
+                socket.emit('finish_game', {
+                    room: currentRoom,
+                    nickname: currentNickname,
+                    cpm: finalCpm,
+                    accuracy: finalAccuracy
                 });
 
-                showModal(`${currentNickname}님 완주!`, `타수: ${finalCpm} 타/분<br>정확도: ${finalAccuracy}%`);
+                showResult(`${currentNickname} 완주`, `${finalCpm} 타/분 · 정확도 ${finalAccuracy}%`);
             }
         }
 
-        socket.on("player_finished", (data) => {
+        socket.on('player_finished', (data) => {
             if (data.nickname !== currentNickname) {
                 gameActive = false;
-                document.getElementById('typingInput').disabled = true;
-                showModal(`🏆 ${data.nickname}님 완주 완료!`, `상대방 기록<br>타수: ${data.cpm} 타/분 | 정확도: ${data.accuracy}%`);
+                hiddenInput.disabled = true;
+                showResult(`${data.nickname} 완주`, `${data.cpm} 타/분 · 정확도 ${data.accuracy}%`);
             }
         });
 
-        function showModal(title, statHtml) {
-            document.getElementById('modalTitle').innerText = title;
-            document.getElementById('modalStatText').innerHTML = statHtml;
-            document.getElementById('resultModal').classList.remove('hidden');
+        function showResult(title, detail) {
+            document.getElementById('resultTitle').innerText = title;
+            document.getElementById('resultDetail').innerText = detail;
+            document.getElementById('resultBanner').classList.remove('hidden');
         }
 
-        function closeModal() {
-            document.getElementById('resultModal').classList.add('hidden');
-            
-            // 한 판 이상 진행했고 게임이 끝난 상태일 때만 "게임 재시작" 버튼 노출
-            if (!gameActive && hasPlayedOnce) {
-                const startBtn = document.getElementById('startBtn');
-                startBtn.innerText = "🔄 게임 재시작";
-                startBtn.classList.remove('hidden');
-            }
-        }
-
-        socket.on("update_progress", (usersProgress) => {
+        socket.on('update_progress', (usersProgress) => {
             const container = document.getElementById('progressContainer');
             container.innerHTML = '';
             for (let user in usersProgress) {
                 let p = usersProgress[user];
                 container.innerHTML += `
-                    <div style="margin-bottom: 8px;">
-                        <div style="font-size: 13px; margin-bottom: 3px; font-weight: 600; color: #334155;">${user}</div>
-                        <div class="progress-container">
-                            <div class="progress-bar" style="width: ${p}%;">${p}%</div>
+                    <div class="player-row">
+                        <div class="player-header">
+                            <span class="player-name">${user}</span>
+                            <span class="player-pct">${p}%</span>
+                        </div>
+                        <div class="track">
+                            <div class="fill" style="width: ${p}%;"></div>
                         </div>
                     </div>
                 `;

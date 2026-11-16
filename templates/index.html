@@ -42,12 +42,11 @@
             max-width: 720px;
         }
 
-        /* 상단 헤더 */
         header {
             display: flex;
             justify-content: space-between;
             align-items: baseline;
-            margin-bottom: 48px;
+            margin-bottom: 40px;
             padding-bottom: 16px;
             border-bottom: 1px solid var(--border);
         }
@@ -112,7 +111,7 @@
             border-color: var(--text-primary);
         }
 
-        /* 버튼 스타일 */
+        /* 버튼 */
         .btn {
             display: inline-flex;
             justify-content: center;
@@ -164,7 +163,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
             font-size: 13px;
             color: var(--text-secondary);
         }
@@ -181,21 +180,22 @@
             margin-left: 6px;
         }
 
-        /* 타이핑 영역 (typing.works 스타일) */
+        /* 제시문 출력 영역 (정상 줄바꿈 적용) */
         .typing-area {
-            position: relative;
-            margin-bottom: 32px;
-            cursor: text;
+            margin-bottom: 24px;
         }
 
         #sentenceDisplay {
-            font-size: 21px;
+            font-size: 20px;
             line-height: 1.85;
             letter-spacing: -0.01em;
             color: var(--text-muted);
+            white-space: pre-wrap;
             word-break: keep-all;
-            min-height: 120px;
+            overflow-wrap: break-word;
+            min-height: 110px;
             user-select: none;
+            margin-bottom: 20px;
         }
 
         .char-correct {
@@ -208,41 +208,50 @@
             border-radius: 2px;
         }
 
+        .char-composing {
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--text-primary);
+        }
+
         .char-current {
             position: relative;
             color: var(--text-muted);
+            border-bottom: 2px solid var(--text-muted);
         }
 
-        .char-current::before {
-            content: "";
-            position: absolute;
-            left: 0;
-            top: 3px;
-            bottom: 3px;
-            width: 2px;
-            background-color: var(--text-primary);
-            animation: blink 1s infinite;
+        /* 미니멀 언더라인 입력창 (실시간 입력 내용 표시) */
+        .input-wrapper {
+            position: relative;
+            margin-bottom: 24px;
         }
 
-        @keyframes blink {
-            0%, 49% { opacity: 1; }
-            50%, 100% { opacity: 0; }
+        #typingInput {
+            width: 100%;
+            padding: 12px 2px;
+            font-size: 18px;
+            font-family: inherit;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: transparent;
+            border: none;
+            border-bottom: 1.5px solid var(--border);
+            border-radius: 0;
+            outline: none;
+            transition: border-color 0.15s;
         }
 
-        /* 화면에 보이지 않는 실제 입력창 */
-        #hiddenInput {
-            position: absolute;
-            opacity: 0;
-            pointer-events: none;
-            width: 1px;
-            height: 1px;
+        #typingInput:focus {
+            border-bottom-color: var(--text-primary);
         }
 
-        .focus-hint {
-            font-size: 12px;
+        #typingInput:disabled {
             color: var(--text-muted);
-            margin-top: 12px;
-            height: 18px;
+            cursor: not-allowed;
+        }
+
+        #typingInput::placeholder {
+            color: var(--text-muted);
+            font-size: 15px;
         }
 
         /* 인라인 결과 배너 */
@@ -254,7 +263,7 @@
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 8px;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
         }
 
         .result-info {
@@ -379,11 +388,12 @@
                 <button class="btn btn-outline" onclick="startGame()">다시 시작</button>
             </div>
 
-            <!-- 문장 출력 및 인라인 타이핑 영역 -->
-            <div class="typing-area" onclick="focusInput()">
+            <!-- 문장 출력 및 실시간 타이핑 입력창 -->
+            <div class="typing-area">
                 <div id="sentenceDisplay">시작 버튼을 누르면 문장이 표시됩니다.</div>
-                <input type="text" id="hiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled oninput="checkTyping()">
-                <div class="focus-hint" id="focusHint"></div>
+                <div class="input-wrapper">
+                    <input type="text" id="typingInput" placeholder="게임 시작 후 이곳에 문장을 입력하세요" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" disabled>
+                </div>
             </div>
 
             <div class="control-bar">
@@ -407,28 +417,26 @@
         let currentNickname = '';
         let targetText = '';
         let gameActive = false;
-        let hasPlayedOnce = false;
+        let isComposing = false;
         let startTime = null;
         let finalCpm = 0;
         let finalAccuracy = 100;
 
-        const hiddenInput = document.getElementById('hiddenInput');
+        const typingInput = document.getElementById('typingInput');
 
-        // 포커스 안내 문구 제어
-        hiddenInput.addEventListener('blur', () => {
-            if (gameActive) {
-                document.getElementById('focusHint').innerText = '계속 입력하려면 문장 영역을 클릭하세요.';
-            }
-        });
-        hiddenInput.addEventListener('focus', () => {
-            document.getElementById('focusHint').innerText = '';
+        // 한글 IME 조합 상태 추적
+        typingInput.addEventListener('compositionstart', () => {
+            isComposing = true;
         });
 
-        function focusInput() {
-            if (gameActive) {
-                hiddenInput.focus();
-            }
-        }
+        typingInput.addEventListener('compositionend', () => {
+            isComposing = false;
+            checkTyping();
+        });
+
+        typingInput.addEventListener('input', () => {
+            checkTyping();
+        });
 
         function joinRoom() {
             const nickname = document.getElementById('nicknameInput').value.trim();
@@ -439,7 +447,6 @@
             }
             currentNickname = nickname;
             currentRoom = room;
-            hasPlayedOnce = false;
             gameActive = false;
             targetText = '';
 
@@ -451,10 +458,9 @@
             document.getElementById('sentenceDisplay').innerText = '시작 버튼을 누르면 문장이 표시됩니다.';
             document.getElementById('cpmDisplay').innerText = '0';
             document.getElementById('accDisplay').innerText = '100%';
-            document.getElementById('focusHint').innerText = '';
 
-            hiddenInput.value = '';
-            hiddenInput.disabled = true;
+            typingInput.value = '';
+            typingInput.disabled = true;
 
             socket.emit('join', { nickname: nickname, room: room });
 
@@ -469,7 +475,6 @@
                 socket.emit('leave', { nickname: currentNickname, room: currentRoom });
             }
             gameActive = false;
-            hasPlayedOnce = false;
             targetText = '';
             currentRoom = '';
 
@@ -490,16 +495,15 @@
         socket.on('game_started', (data) => {
             targetText = data.sentence;
             gameActive = true;
-            hasPlayedOnce = true;
+            isComposing = false;
             startTime = new Date().getTime();
 
             document.getElementById('resultBanner').classList.add('hidden');
             document.getElementById('startBtn').classList.add('hidden');
-            document.getElementById('focusHint').innerText = '';
 
-            hiddenInput.value = '';
-            hiddenInput.disabled = false;
-            hiddenInput.focus();
+            typingInput.value = '';
+            typingInput.disabled = false;
+            typingInput.focus();
 
             renderSentence();
             document.getElementById('cpmDisplay').innerText = '0';
@@ -508,17 +512,20 @@
 
         function renderSentence() {
             let html = '';
-            const typedVal = hiddenInput.value;
+            const typedVal = typingInput.value;
 
             for (let i = 0; i < targetText.length; i++) {
-                const char = targetText[i] === ' ' ? '&nbsp;' : targetText[i];
+                const char = targetText[i];
                 if (i < typedVal.length) {
-                    if (typedVal[i] === targetText[i]) {
+                    // 마지막 글자가 한글 조합 중인 경우 오타로 표시하지 않음
+                    if (i === typedVal.length - 1 && isComposing) {
+                        html += `<span class="char-composing">${char}</span>`;
+                    } else if (typedVal[i] === targetText[i]) {
                         html += `<span class="char-correct">${char}</span>`;
                     } else {
                         html += `<span class="char-incorrect">${char}</span>`;
                     }
-                } else if (i === typedVal.length) {
+                } else if (i === typedVal.length && !isComposing) {
                     html += `<span class="char-current">${char}</span>`;
                 } else {
                     html += `<span>${char}</span>`;
@@ -529,13 +536,17 @@
 
         function checkTyping() {
             if (!gameActive || !targetText) return;
-            const typed = hiddenInput.value;
+            const typed = typingInput.value;
 
             let correctCount = 0;
             let errorCount = 0;
 
             for (let i = 0; i < typed.length; i++) {
                 if (i < targetText.length) {
+                    // 조합 중인 마지막 글자는 오타 집계에서 제외
+                    if (i === typed.length - 1 && isComposing) {
+                        break;
+                    }
                     if (typed[i] === targetText[i]) {
                         correctCount++;
                     } else {
@@ -550,7 +561,11 @@
             const currentTime = new Date().getTime();
             const elapsedMinutes = (currentTime - startTime) / 60000;
             finalCpm = elapsedMinutes > 0 ? Math.floor(correctCount / elapsedMinutes) : 0;
-            finalAccuracy = typed.length > 0 ? Math.max(0, Math.floor(((typed.length - errorCount) / typed.length) * 100)) : 100;
+
+            const evaluatedLength = isComposing ? Math.max(0, typed.length - 1) : typed.length;
+            finalAccuracy = evaluatedLength > 0
+                ? Math.max(0, Math.floor(((evaluatedLength - errorCount) / evaluatedLength) * 100))
+                : 100;
 
             document.getElementById('cpmDisplay').innerText = finalCpm;
             document.getElementById('accDisplay').innerText = `${finalAccuracy}%`;
@@ -560,9 +575,10 @@
 
             socket.emit('user_progress', { room: currentRoom, nickname: currentNickname, progress: progress });
 
-            if (targetText.length > 0 && typed.length > 0 && typed.trim() === targetText.trim()) {
+            // 조합이 완료된 상태에서 문장이 정확히 일치할 때 완주 처리
+            if (!isComposing && targetText.length > 0 && typed.length > 0 && typed.trim() === targetText.trim()) {
                 gameActive = false;
-                hiddenInput.disabled = true;
+                typingInput.disabled = true;
 
                 socket.emit('finish_game', {
                     room: currentRoom,
@@ -578,7 +594,7 @@
         socket.on('player_finished', (data) => {
             if (data.nickname !== currentNickname) {
                 gameActive = false;
-                hiddenInput.disabled = true;
+                typingInput.disabled = true;
                 showResult(`${data.nickname} 완주`, `${data.cpm} 타/분 · 정확도 ${data.accuracy}%`);
             }
         });
